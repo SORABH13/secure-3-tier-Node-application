@@ -1,0 +1,6 @@
+aws_region = "us-east-1"
+environment = "prod"
+project_name = "secure-3-tier-node-application"
+
+# Optional: set additional prod-specific variables here.
+# ecr_repository_name = "secure-3-tier-node-application"
