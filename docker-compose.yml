@@ -5,15 +5,15 @@ services:
     image: postgres:16.8-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-devops}
+      POSTGRES_USER: ${POSTGRES_USER:-devops_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devops_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - backend
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devops_user} -d ${POSTGRES_DB:-devops}"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -28,9 +28,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${API_PORT:-3001}
-      DB: ${POSTGRES_DB}
-      DBUSER: ${POSTGRES_USER}
-      DBPASS: ${POSTGRES_PASSWORD}
+      DB: ${POSTGRES_DB:-devops}
+      DBUSER: ${POSTGRES_USER:-devops_user}
+      DBPASS: ${POSTGRES_PASSWORD:-devops_pass}
       DBHOST: postgres
       DBPORT: 5432
     ports:
@@ -39,7 +39,7 @@ services:
       - backend
       - frontend
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path:'/api/status'}, res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));\""]
+      test: ["CMD", "node", "-e", "const p=process.env.PORT||3000; const http=require('http'); const url='http://127.0.0.1:'+p+'/api/status'; const req=http.get(url, res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -60,7 +60,7 @@ services:
     networks:
       - frontend
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path='/'} , res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));\""]
+      test: ["CMD", "node", "-e", "const p=process.env.PORT||3000; const http=require('http'); const url='http://127.0.0.1:'+p+'/'; const req=http.get(url, res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));"]
       interval: 30s
       timeout: 5s
       retries: 3

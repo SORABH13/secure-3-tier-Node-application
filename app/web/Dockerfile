@@ -18,8 +18,8 @@ ENV NODE_ENV=production
 COPY --chown=appuser:appgroup package*.json ./
 
 # Install production dependencies from lockfile for reproducible builds.
-# This requires package-lock.json to be present in the build context.
-RUN npm ci --omit=dev
+# Fall back to npm install when package-lock.json is missing.
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --production; fi
 
 # Copy application code with ownership for the non-root user.
 COPY --chown=appuser:appgroup . .
@@ -32,6 +32,6 @@ EXPOSE 3000
 
 # Healthcheck verifies the configured runtime port using Node.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD-SHELL node -e "const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path:'/'}, res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));"
+  CMD ["node", "-e", "const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path:'/'} , res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));"]
 
 CMD ["node", "./bin/www"]
