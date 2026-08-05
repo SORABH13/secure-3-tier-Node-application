@@ -1,0 +1,16 @@
+# Ignore dependencies installed locally. They are installed inside the image.
+node_modules
+
+# Ignore local logs and temporary artifacts.
+npm-debug.log
+npm-error.log
+.DS_Store
+
+# Ignore git metadata and environment files.
+.git
+.env
+
+# Ignore build files and compose artifacts.
+Dockerfile*
+docker-compose*
+coverage

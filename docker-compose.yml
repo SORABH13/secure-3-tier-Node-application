@@ -1,0 +1,76 @@
+# Compose configuration for the secure 3-tier Node.js application.
+# It defines PostgreSQL, API, and web services with dedicated frontend/backend networks.
+services:
+  postgres:
+    image: postgres:16.8-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./app/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: production
+      PORT: ${API_PORT:-3001}
+      DB: ${POSTGRES_DB}
+      DBUSER: ${POSTGRES_USER}
+      DBPASS: ${POSTGRES_PASSWORD}
+      DBHOST: postgres
+      DBPORT: 5432
+    ports:
+      - "3001:3001"
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path:'/api/status'}, res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./app/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: production
+      PORT: ${WEB_PORT:-3000}
+      API_HOST: http://api:${API_PORT:-3001}
+    ports:
+      - "3000:3000"
+    networks:
+      - frontend
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const p=process.env.PORT||3000; const http=require('http'); const req=http.get({hostname:'127.0.0.1', port:p, path='/'} , res=>{ process.exit(res.statusCode===200?0:1); }); req.on('error', ()=>process.exit(1));\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
