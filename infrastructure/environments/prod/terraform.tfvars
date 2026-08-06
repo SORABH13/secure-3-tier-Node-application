@@ -1,7 +1,6 @@
 project_name             = "node3tier"
 environment              = "prod"
-github_repo              = "SORABH13/secure-3-tier-Node-application"
-github_branch            = "feature/project-analysis"
+# OIDC-related variables removed; using static AWS credentials instead
 aws_region               = "us-east-1"
 availability_zones       = ["us-east-1a", "us-east-1b"]
 vpc_cidr                 = "10.0.0.0/16"

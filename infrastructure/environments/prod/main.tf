@@ -49,10 +49,7 @@ module "iam" {
   ecr_repository_arns      = [module.ecr.web_repository_arn, module.ecr.api_repository_arn]
   secret_arns              = [module.secrets_manager.db_secret_arn]
   tags                     = var.tags
-  github_oidc_provider_arn = var.github_oidc_provider_arn
-  github_repo              = var.github_repo
-  github_branch            = var.github_branch
-  github_actions_role_name = var.github_actions_role_name
+  # OIDC role creation disabled for this deployment
 }
 
 module "rds" {
@@ -163,7 +160,4 @@ output "api_repository_uri" {
   value       = module.ecr.api_repository_uri
 }
 
-output "github_actions_role_arn" {
-  description = "IAM role ARN created for GitHub Actions OIDC assume."
-  value       = module.iam.github_actions_role_arn
-}
+

@@ -35,27 +35,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-
-variable "github_oidc_provider_arn" {
-  description = "OIDC provider ARN for GitHub Actions (e.g. arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com)."
-  type        = string
-  default     = ""
-}
-
-variable "github_repo" {
-  description = "GitHub repository in the form owner/repo used to scope the OIDC trust (e.g. sourabhyogi/repo)."
-  type        = string
-  default     = ""
-}
-
-variable "github_branch" {
-  description = "Branch name to allow when scoping the OIDC trust (e.g. main or master). Use '*' for any branch."
-  type        = string
-  default     = "main"
-}
-
-variable "github_actions_role_name" {
-  description = "Optional name for the IAM role created for GitHub Actions assume via OIDC."
-  type        = string
-  default     = ""
-}

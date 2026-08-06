@@ -1,5 +1,4 @@
-github_repo = "SORABH13/secure-3-tier-Node-application"
-github_branch = "feature/project-analysis"
+# OIDC-related variables removed; using static AWS credentials instead
 db_password = "SuperS3cureP@ssw0rd!"
 # keep other values as defaults; don't set web_image/api_image (CI will set them)project_name = "node3tier"
 environment = "prod"

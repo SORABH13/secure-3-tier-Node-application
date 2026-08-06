@@ -139,26 +139,3 @@ variable "tags" {
   }
 }
 
-variable "github_oidc_provider_arn" {
-  description = "OIDC provider ARN for GitHub Actions."
-  type        = string
-  default     = "arn:aws:iam::913024025975:oidc-provider/token.actions.githubusercontent.com"
-}
-
-variable "github_repo" {
-  description = "GitHub repository in the form owner/repo used to scope the OIDC trust (e.g. owner/repo)."
-  type        = string
-  default     = ""
-}
-
-variable "github_branch" {
-  description = "Branch name to allow when scoping the OIDC trust (use '*' for any branch)."
-  type        = string
-  default     = "main"
-}
-
-variable "github_actions_role_name" {
-  description = "Optional name for the IAM role created for GitHub Actions assume via OIDC."
-  type        = string
-  default     = ""
-}
