@@ -1,18 +1,23 @@
-# $module Module
+# ECR Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module provisions Amazon ECR repositories for the node3tier application.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Host container images for Web and API services.
+- Enable image scanning on push.
+- Enforce a lifecycle policy to retain the most recent 30 images.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `tags`
+- `image_tag_mutability`
+
+## Outputs
+
+- `web_repository_uri`
+- `api_repository_uri`
+- `web_repository_arn`
+- `api_repository_arn`

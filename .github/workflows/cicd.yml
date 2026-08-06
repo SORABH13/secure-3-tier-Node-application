@@ -1,0 +1,151 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - master
+      - feature/project-analysis
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  actions: read
+
+env:
+  AWS_REGION: us-east-1
+  TF_WORKING_DIR: infrastructure/environments/prod
+
+jobs:
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '18'
+
+      - name: Install root dependencies
+        working-directory: app/api
+        run: npm install
+
+      - name: Install web dependencies
+        working-directory: app/web
+        run: npm install
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0
+
+      - name: Terraform fmt
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+  build-and-push:
+    name: Build and Push Docker Images
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repositories if missing
+        run: |
+          aws ecr describe-repositories --repository-names node3tier-web || aws ecr create-repository --repository-name node3tier-web --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+          aws ecr describe-repositories --repository-names node3tier-api || aws ecr create-repository --repository-name node3tier-api --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+
+      - name: Build and push Web image
+        run: |
+          WEB_URI=$(aws ecr describe-repositories --repository-names node3tier-web --query 'repositories[0].repositoryUri' --output text)
+          docker build --tag "$WEB_URI:latest" app/web
+          docker push "$WEB_URI:latest"
+          echo "WEB_IMAGE=$WEB_URI:latest" >> $GITHUB_ENV
+
+      - name: Build and push API image
+        run: |
+          API_URI=$(aws ecr describe-repositories --repository-names node3tier-api --query 'repositories[0].repositoryUri' --output text)
+          docker build --tag "$API_URI:latest" app/api
+          docker push "$API_URI:latest"
+          echo "API_IMAGE=$API_URI:latest" >> $GITHUB_ENV
+
+  deploy:
+    name: Deploy Infrastructure and Apps
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform plan -var="web_image=${{ env.WEB_IMAGE }}" -var="api_image=${{ env.API_IMAGE }}" -out=tfplan
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false tfplan
+
+      - name: Smoke test Web endpoint
+        run: |
+          URL=$(terraform output -raw cloudfront_domain)
+          echo "Smoke testing https://$URL"
+          curl --fail --show-error --silent "https://$URL"
+
+      - name: Smoke test API endpoint
+        run: |
+          URL=$(terraform output -raw cloudfront_domain)
+          echo "Smoke testing https://$URL/api/status"
+          curl --fail --show-error --silent "https://$URL/api/status"

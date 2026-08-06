@@ -1,26 +1,164 @@
-variable "aws_region" {
-  description = "AWS region for the production environment."
+variable "project_name" {
+  description = "Project name used across the production environment."
   type        = string
-  default     = "us-east-1"
+  default     = "node3tier"
 }
 
 variable "environment" {
-  description = "Deployment environment identifier."
+  description = "Deployment environment name."
   type        = string
   default     = "prod"
 }
 
-variable "project_name" {
-  description = "Project name used for resource naming."
+variable "aws_region" {
+  description = "AWS region for production resources."
   type        = string
-  default     = "secure-3-tier-node-application"
+  default     = "us-east-1"
+}
+
+variable "availability_zones" {
+  description = "Availability zones for networking subnets."
+  type        = list(string)
+  default     = ["us-east-1a", "us-east-1b"]
+}
+
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "public_subnet_cidrs" {
+  description = "CIDR blocks for public subnets."
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+}
+
+variable "private_app_subnet_cidrs" {
+  description = "CIDR blocks for private application subnets."
+  type        = list(string)
+  default     = ["10.0.11.0/24", "10.0.12.0/24"]
+}
+
+variable "private_db_subnet_cidrs" {
+  description = "CIDR blocks for private database subnets."
+  type        = list(string)
+  default     = ["10.0.21.0/24", "10.0.22.0/24"]
+}
+
+variable "alb_ingress_cidrs" {
+  description = "IPv4 CIDR ranges permitted to reach the ALB."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "alb_ingress_ipv6_cidrs" {
+  description = "IPv6 CIDR ranges permitted to reach the ALB."
+  type        = list(string)
+  default     = ["::/0"]
+}
+
+variable "db_username" {
+  description = "Master database username."
+  type        = string
+  default     = "node3tieradmin"
+}
+
+variable "db_password" {
+  description = "Master database password."
+  type        = string
+  sensitive   = true
+}
+
+variable "db_name" {
+  description = "Initial database name."
+  type        = string
+  default     = "node3tier"
+}
+
+variable "db_instance_class" {
+  description = "RDS instance class."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "allocated_storage" {
+  description = "Allocated storage for RDS in GB."
+  type        = number
+  default     = 20
+}
+
+variable "engine_version" {
+  description = "PostgreSQL engine version."
+  type        = string
+  default     = "15.4"
+}
+
+variable "backup_retention_period" {
+  description = "RDS backup retention days."
+  type        = number
+  default     = 7
+}
+
+variable "deletion_protection" {
+  description = "Enable deletion protection for RDS."
+  type        = bool
+  default     = true
+}
+
+variable "certificate_arn" {
+  description = "Optional ACM certificate ARN for the ALB and CloudFront origin."
+  type        = string
+  default     = ""
+}
+
+variable "cloudfront_aliases" {
+  description = "Optional CloudFront aliases."
+  type        = list(string)
+  default     = []
+}
+
+variable "web_image" {
+  description = "ECR image URI for the Web service."
+  type        = string
+  default     = ""
+}
+
+variable "api_image" {
+  description = "ECR image URI for the API service."
+  type        = string
+  default     = ""
 }
 
 variable "tags" {
-  description = "Common tags applied to resources."
+  description = "Common tags applied to all resources."
   type        = map(string)
   default = {
+    Project     = "node3tier"
     Environment = "prod"
-    Project     = "secure-3-tier-node-application"
   }
+}
+
+variable "github_oidc_provider_arn" {
+  description = "OIDC provider ARN for GitHub Actions."
+  type        = string
+  default     = "arn:aws:iam::913024025975:oidc-provider/token.actions.githubusercontent.com"
+}
+
+variable "github_repo" {
+  description = "GitHub repository in the form owner/repo used to scope the OIDC trust (e.g. owner/repo)."
+  type        = string
+  default     = ""
+}
+
+variable "github_branch" {
+  description = "Branch name to allow when scoping the OIDC trust (use '*' for any branch)."
+  type        = string
+  default     = "main"
+}
+
+variable "github_actions_role_name" {
+  description = "Optional name for the IAM role created for GitHub Actions assume via OIDC."
+  type        = string
+  default     = ""
 }

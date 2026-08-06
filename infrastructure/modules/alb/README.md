@@ -1,18 +1,30 @@
-# $module Module
+# ALB Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module provisions an Application Load Balancer for the Web ECS service.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Create a public ALB in the provided public subnets.
+- Configure HTTP to HTTPS redirect.
+- Create an HTTPS listener when a certificate ARN is provided.
+- Create a target group for the Web ECS service.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `vpc_id`
+- `subnet_ids`
+- `security_group_id`
+- `certificate_arn`
+- `health_check_path`
+- `target_group_port`
+- `tags`
+
+## Outputs
+
+- `alb_arn`
+- `alb_dns_name`
+- `target_group_arn`
+- `target_group_name`
+- `https_listener_arn`

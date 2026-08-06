@@ -4,7 +4,7 @@ resource "aws_vpc" "this" {
   enable_dns_hostnames = var.enable_dns_hostnames
 
   tags = merge(local.common_tags, {
-    Name = format("%s-vpc", var.name)
+    Name = format("%s-vpc%s", local.name_prefix, length(trimspace(var.name_suffix)) > 0 ? "-" : "")
   })
 }
 
@@ -12,8 +12,30 @@ resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-igw", var.name)
+    Name = format("%s-igw", local.name_prefix)
   })
+}
+
+resource "aws_eip" "nat" {
+  count  = var.nat_gateway_allocation_id == "" ? 1 : 0
+  domain = "vpc"
+
+  depends_on = [aws_internet_gateway.this]
+
+  tags = merge(local.common_tags, {
+    Name = format("%s-nat-eip", local.name_prefix)
+  })
+}
+
+resource "aws_nat_gateway" "this" {
+  allocation_id = var.nat_gateway_allocation_id != "" ? var.nat_gateway_allocation_id : aws_eip.nat[0].id
+  subnet_id     = aws_subnet.public[local.nat_subnet_name].id
+
+  tags = merge(local.common_tags, {
+    Name = format("%s-nat-gateway", local.name_prefix)
+  })
+
+  depends_on = [aws_internet_gateway.this]
 }
 
 resource "aws_subnet" "public" {
@@ -58,30 +80,11 @@ resource "aws_subnet" "private_db" {
   })
 }
 
-resource "aws_eip" "nat" {
-  vpc = true
-
-  tags = merge(local.common_tags, {
-    Name = format("%s-nat-eip", var.name)
-  })
-}
-
-resource "aws_nat_gateway" "this" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[local.nat_subnet_name].id
-
-  tags = merge(local.common_tags, {
-    Name = format("%s-nat-gateway", var.name)
-  })
-
-  depends_on = [aws_internet_gateway.this]
-}
-
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-public-rt", var.name)
+    Name = format("%s-public-rt", local.name_prefix)
   })
 }
 
@@ -95,7 +98,7 @@ resource "aws_route_table" "private_app" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-private-app-rt", var.name)
+    Name = format("%s-private-app-rt", local.name_prefix)
   })
 }
 
@@ -109,7 +112,7 @@ resource "aws_route_table" "private_db" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-private-db-rt", var.name)
+    Name = format("%s-private-db-rt", local.name_prefix)
   })
 }
 

@@ -1,18 +1,22 @@
-# $module Module
+# Secrets Manager Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module creates a Secrets Manager secret for PostgreSQL credentials.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Store database username and password securely.
+- Provide an ARN for ECS task access.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `db_username`
+- `db_password`
+- `db_name`
+- `tags`
+
+## Outputs
+
+- `db_secret_arn`
+- `db_secret_name`
