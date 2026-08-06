@@ -17,8 +17,8 @@ env:
   TF_WORKING_DIR: infrastructure/environments/prod
 
 jobs:
-  terraform:
-    name: Terraform Deploy (infra only)
+  terraform-plan:
+    name: Terraform Plan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -50,10 +50,53 @@ jobs:
         run: terraform validate
 
       - name: Terraform plan
+        id: tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform plan -var-file="terraform.tfvars" -out=tfplan || true
 
+      - name: Upload tfplan
+        id: upload-plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+
+  approval:
+    name: Manual approval
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    environment: production
+    steps:
+      - name: Awaiting approval
+        run: echo "Manual approval required to continue to terraform apply."
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: [terraform-plan, approval]
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download tfplan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0
+
       - name: Terraform apply
-        if: github.event_name != 'pull_request'
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -input=false tfplan

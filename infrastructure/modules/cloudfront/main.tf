@@ -60,6 +60,13 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  dynamic "viewer_certificate" {
+    for_each = var.certificate_arn == "" ? [1] : []
+    content {
+      cloudfront_default_certificate = true
+    }
+  }
+
   aliases = var.aliases
 
   tags = merge(local.common_tags, {
