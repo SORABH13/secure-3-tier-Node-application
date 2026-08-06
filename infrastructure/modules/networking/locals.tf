@@ -1,0 +1,25 @@
+locals {
+  common_tags = merge(var.tags, {
+    TerraformModule = "networking"
+  })
+
+  public_subnets = [for idx, az in var.availability_zones : {
+    name = format("%s-public-%02d", var.name, idx + 1)
+    az   = az
+    cidr = var.public_subnet_cidrs[idx]
+  }]
+
+  private_app_subnets = [for idx, az in var.availability_zones : {
+    name = format("%s-private-app-%02d", var.name, idx + 1)
+    az   = az
+    cidr = var.private_app_subnet_cidrs[idx]
+  }]
+
+  private_db_subnets = [for idx, az in var.availability_zones : {
+    name = format("%s-private-db-%02d", var.name, idx + 1)
+    az   = az
+    cidr = var.private_db_subnet_cidrs[idx]
+  }]
+
+  nat_subnet_name = local.public_subnets[0].name
+}
