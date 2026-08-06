@@ -11,13 +11,7 @@ variable "environment" {
 variable "dashboard_name" {
   description = "CloudWatch dashboard name."
   type        = string
-  default     = "node3tier-prod-dashboard"
-}
-
-variable "log_group_names" {
-  description = "List of CloudWatch log group names to create."
-  type        = list(string)
-  default     = []
+  default     = "toptal-prod-dashboard"
 }
 
 variable "cluster_name" {

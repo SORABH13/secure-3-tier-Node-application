@@ -106,17 +106,6 @@ data "aws_region" "current" {}
 
 data "aws_caller_identity" "current" {}
 
-resource "aws_cloudwatch_log_group" "this" {
-  for_each = toset(var.log_group_names)
-
-  name              = each.value
-  retention_in_days = 30
-
-  tags = merge(local.common_tags, {
-    Name = each.value
-  })
-}
-
 resource "aws_cloudwatch_dashboard" "this" {
   dashboard_name = var.dashboard_name
   dashboard_body = local.dashboard_body

@@ -1,6 +1,6 @@
 # Security Module
 
-This module creates AWS Security Groups for the node3tier secure architecture.
+This module creates AWS Security Groups for the toptal secure architecture.
 
 ## Purpose
 

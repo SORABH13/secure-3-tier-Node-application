@@ -32,12 +32,20 @@ variable "db_password" {
   description = "Master password for the RDS PostgreSQL instance."
   type        = string
   sensitive   = true
+
+  validation {
+    condition = (
+      can(regex("^[!-~]{8,41}$", var.db_password)) &&
+      !can(regex("[/@\\x22]", var.db_password))
+    )
+    error_message = "db_password must be 8-41 printable ASCII characters and must not contain '/', '@', double quotes, or spaces."
+  }
 }
 
 variable "db_name" {
   description = "Initial database name for PostgreSQL."
   type        = string
-  default     = "node3tier"
+  default     = "toptal"
 }
 
 variable "db_instance_class" {
@@ -50,18 +58,32 @@ variable "allocated_storage" {
   description = "Allocated storage in GB for PostgreSQL."
   type        = number
   default     = 20
+
+  validation {
+    condition     = var.allocated_storage >= 20
+    error_message = "allocated_storage must be at least 20 GB for this RDS instance."
+  }
 }
 
 variable "engine_version" {
-  description = "PostgreSQL engine version."
+  description = "Explicit PostgreSQL engine version, including its major version."
   type        = string
-  default     = "15.4"
+
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$", var.engine_version))
+    error_message = "engine_version must be an explicit version such as 15.18."
+  }
 }
 
 variable "backup_retention_period" {
   description = "Automated backup retention period in days."
   type        = number
   default     = 7
+
+  validation {
+    condition     = var.backup_retention_period >= 0 && var.backup_retention_period <= 35
+    error_message = "backup_retention_period must be between 0 and 35 days."
+  }
 }
 
 variable "deletion_protection" {
@@ -73,11 +95,21 @@ variable "deletion_protection" {
 variable "db_subnet_ids" {
   description = "List of private DB subnet IDs for the RDS subnet group."
   type        = list(string)
+
+  validation {
+    condition     = length(var.db_subnet_ids) >= 2
+    error_message = "db_subnet_ids must contain at least two subnets in different Availability Zones."
+  }
 }
 
 variable "vpc_security_group_ids" {
   description = "Security group IDs for the RDS instance."
   type        = list(string)
+
+  validation {
+    condition     = length(var.vpc_security_group_ids) > 0
+    error_message = "vpc_security_group_ids must contain at least one security group."
+  }
 }
 
 variable "tags" {

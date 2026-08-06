@@ -1,6 +1,6 @@
 # CloudWatch Module
 
-This module creates CloudWatch resources for monitoring the node3tier environment.
+This module creates CloudWatch resources for monitoring the toptal environment.
 
 ## Purpose
 

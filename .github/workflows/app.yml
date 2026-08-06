@@ -1,63 +1,118 @@
-name: App CI (build & deploy)
+name: Deploy application
 
 on:
   push:
     branches:
       - master
-      - feature/project-analysis
-  workflow_dispatch: {}
+    paths:
+      - "app/**"
+      - ".github/workflows/app.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the images to existing ECS services
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
+
+concurrency:
+  group: production-application-deploy
+  cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-1
+  PROJECT_NAME: toptal
+  ENVIRONMENT: prod
 
 jobs:
-  build-and-deploy:
-    name: Build, push images and deploy to ECS
+  build-push-deploy:
+    name: Build, publish, and deploy ECS services
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & push Web image
+      - name: Set deployment values
+        id: deployment
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
-          WEB_REPO=${{ secrets.ECR_WEB_REPO }}
-          WEB_TAG=${{ github.sha }}
-          docker build -t ${WEB_REPO}:${WEB_TAG} -f web/Dockerfile ./web
-          docker tag ${WEB_REPO}:${WEB_TAG} ${WEB_REPO}:latest
-          docker push ${WEB_REPO}:${WEB_TAG}
-          docker push ${WEB_REPO}:latest
+          echo "web_repository=${REGISTRY}/${PROJECT_NAME}-${ENVIRONMENT}-web" >> "$GITHUB_OUTPUT"
+          echo "api_repository=${REGISTRY}/${PROJECT_NAME}-${ENVIRONMENT}-api" >> "$GITHUB_OUTPUT"
+          echo "cluster=${PROJECT_NAME}-${ENVIRONMENT}-cluster" >> "$GITHUB_OUTPUT"
+          echo "web_service=${PROJECT_NAME}-${ENVIRONMENT}-web" >> "$GITHUB_OUTPUT"
+          echo "api_service=${PROJECT_NAME}-${ENVIRONMENT}-api" >> "$GITHUB_OUTPUT"
 
-      - name: Build & push API image
+      - name: Confirm ECR repositories exist
         run: |
-          API_REPO=${{ secrets.ECR_API_REPO }}
-          API_TAG=${{ github.sha }}
-          docker build -t ${API_REPO}:${API_TAG} -f api/Dockerfile ./api
-          docker tag ${API_REPO}:${API_TAG} ${API_REPO}:latest
-          docker push ${API_REPO}:${API_TAG}
-          docker push ${API_REPO}:latest
+          aws ecr describe-repositories --repository-names \
+            "${PROJECT_NAME}-${ENVIRONMENT}-web" \
+            "${PROJECT_NAME}-${ENVIRONMENT}-api"
 
-      - name: Force new deployment (Web)
-        if: secrets.ECS_CLUSTER && secrets.ECS_WEB_SERVICE
+      - name: Build and push web image
+        env:
+          IMAGE: ${{ steps.deployment.outputs.web_repository }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws ecs update-service --cluster "${{ secrets.ECS_CLUSTER }}" --service "${{ secrets.ECS_WEB_SERVICE }}" --force-new-deployment
+          docker build --tag "$IMAGE:$IMAGE_TAG" app/web
+          docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
+          docker push "$IMAGE:$IMAGE_TAG"
+          docker push "$IMAGE:latest"
 
-      - name: Force new deployment (API)
-        if: secrets.ECS_CLUSTER && secrets.ECS_API_SERVICE
+      - name: Build and push API image
+        env:
+          IMAGE: ${{ steps.deployment.outputs.api_repository }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws ecs update-service --cluster "${{ secrets.ECS_CLUSTER }}" --service "${{ secrets.ECS_API_SERVICE }}" --force-new-deployment
+          docker build --tag "$IMAGE:$IMAGE_TAG" app/api
+          docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
+          docker push "$IMAGE:$IMAGE_TAG"
+          docker push "$IMAGE:latest"
+
+      - name: Verify ECS services use the expected images
+        if: github.event_name != 'workflow_dispatch' || inputs.deploy
+        env:
+          CLUSTER: ${{ steps.deployment.outputs.cluster }}
+          WEB_SERVICE: ${{ steps.deployment.outputs.web_service }}
+          API_SERVICE: ${{ steps.deployment.outputs.api_service }}
+          WEB_IMAGE: ${{ steps.deployment.outputs.web_repository }}:latest
+          API_IMAGE: ${{ steps.deployment.outputs.api_repository }}:latest
+        run: |
+          get_image() {
+            local service="$1"
+            local container="$2"
+            local task_definition
+            task_definition=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].taskDefinition' --output text)
+            aws ecs describe-task-definition --task-definition "$task_definition" --query "taskDefinition.containerDefinitions[?name=='$container'].image | [0]" --output text
+          }
+
+          test "$(get_image "$WEB_SERVICE" web)" = "$WEB_IMAGE"
+          test "$(get_image "$API_SERVICE" api)" = "$API_IMAGE"
+
+      - name: Deploy ECS services
+        if: github.event_name != 'workflow_dispatch' || inputs.deploy
+        env:
+          CLUSTER: ${{ steps.deployment.outputs.cluster }}
+          WEB_SERVICE: ${{ steps.deployment.outputs.web_service }}
+          API_SERVICE: ${{ steps.deployment.outputs.api_service }}
+        run: |
+          aws ecs update-service --cluster "$CLUSTER" --service "$WEB_SERVICE" --force-new-deployment
+          aws ecs update-service --cluster "$CLUSTER" --service "$API_SERVICE" --force-new-deployment
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$WEB_SERVICE" "$API_SERVICE"

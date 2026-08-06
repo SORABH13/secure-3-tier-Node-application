@@ -22,7 +22,7 @@ resource "aws_cloudfront_distribution" "this" {
       http_port              = 80
       https_port             = 443
       origin_protocol_policy = var.certificate_arn != "" ? "https-only" : "http-only"
-      origin_ssl_protocols   = var.certificate_arn != "" ? ["TLSv1.2"] : []
+      origin_ssl_protocols   = ["TLSv1.2"]
     }
   }
 

@@ -1,5 +1,5 @@
-project_name             = "node3tier"
-environment              = "prod"
+project_name = "toptal"
+environment  = "prod"
 # OIDC-related variables removed; using static AWS credentials instead
 aws_region               = "us-east-1"
 availability_zones       = ["us-east-1a", "us-east-1b"]
@@ -10,18 +10,16 @@ private_db_subnet_cidrs  = ["10.0.21.0/24", "10.0.22.0/24"]
 alb_ingress_cidrs        = ["0.0.0.0/0"]
 alb_ingress_ipv6_cidrs   = ["::/0"]
 
-db_username = "node3tieradmin"
-db_password = "SuperS3cureP@ssw0rd!"
-db_name     = "node3tier"
+db_username = "toptaladmin"
+db_password = "5b8c4acfc69403bf46c79fdf870dee4151d49a35"
+db_name     = "toptal"
 
 db_instance_class       = "db.t4g.micro"
 allocated_storage       = 20
-engine_version          = "15.4"
+engine_version          = "15.18"
 backup_retention_period = 7
 deletion_protection     = true
 
-web_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/node3tier-web:latest"
-api_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/node3tier-api:latest"
 
 certificate_arn    = ""
 cloudfront_aliases = []

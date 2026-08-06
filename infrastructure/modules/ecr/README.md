@@ -1,6 +1,6 @@
 # ECR Module
 
-This module provisions Amazon ECR repositories for the node3tier application.
+This module provisions Amazon ECR repositories for the toptal application.
 
 ## Purpose
 

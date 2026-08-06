@@ -1,7 +1,7 @@
 variable "project_name" {
   description = "Project name used across the production environment."
   type        = string
-  default     = "node3tier"
+  default     = "toptal"
 }
 
 variable "environment" {
@@ -61,7 +61,7 @@ variable "alb_ingress_ipv6_cidrs" {
 variable "db_username" {
   description = "Master database username."
   type        = string
-  default     = "node3tieradmin"
+  default     = "toptaladmin"
 }
 
 variable "db_password" {
@@ -73,7 +73,7 @@ variable "db_password" {
 variable "db_name" {
   description = "Initial database name."
   type        = string
-  default     = "node3tier"
+  default     = "toptal"
 }
 
 variable "db_instance_class" {
@@ -91,7 +91,7 @@ variable "allocated_storage" {
 variable "engine_version" {
   description = "PostgreSQL engine version."
   type        = string
-  default     = "15.4"
+  default     = "15.18"
 }
 
 variable "backup_retention_period" {
@@ -134,8 +134,7 @@ variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)
   default = {
-    Project     = "node3tier"
+    Project     = "toptal"
     Environment = "prod"
   }
 }
-

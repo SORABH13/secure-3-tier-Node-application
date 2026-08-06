@@ -55,6 +55,28 @@ resource "aws_iam_role_policy_attachment" "task_execution_ecr" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  count = length(var.secret_arns) > 0 ? 1 : 0
+
+  name   = format("%s-task-execution-secrets", local.name_prefix)
+  role   = aws_iam_role.task_execution.id
+  policy = data.aws_iam_policy_document.task_execution_secrets.json
+}
+
+data "aws_iam_policy_document" "task_execution_secrets" {
+  dynamic "statement" {
+    for_each = var.secret_arns
+    content {
+      effect = "Allow"
+      actions = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ]
+      resources = [statement.value]
+    }
+  }
+}
+
 resource "aws_iam_policy" "task_role_policy" {
   name        = format("%s-task-role-policy", local.name_prefix)
   description = "IAM policy for ECS task role to access Secrets Manager and CloudWatch Logs."

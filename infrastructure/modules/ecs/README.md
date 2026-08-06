@@ -1,6 +1,6 @@
 # ECS Module
 
-This module provisions ECS Fargate cluster resources for the node3tier application.
+This module provisions ECS Fargate cluster resources for the toptal application.
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # RDS Module
 
-This module provisions a PostgreSQL RDS instance for the node3tier environment.
+This module provisions a PostgreSQL RDS instance for the toptal environment.
 
 ## Purpose
 

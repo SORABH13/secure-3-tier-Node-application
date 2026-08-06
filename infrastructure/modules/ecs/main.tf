@@ -92,7 +92,7 @@ resource "aws_ecs_task_definition" "web" {
       ]
       environment = [
         {
-          name  = "API_BASE_URL"
+          name  = "API_HOST"
           value = local.api_service_endpoint
         }
       ]
@@ -130,22 +130,30 @@ resource "aws_ecs_task_definition" "api" {
       ]
       environment = [
         {
-          name  = "DB_HOST"
+          name  = "PORT"
+          value = tostring(var.api_service_port)
+        },
+        {
+          name  = "DBHOST"
           value = var.db_host
         },
         {
-          name  = "DB_NAME"
+          name  = "DB"
           value = var.db_name
         },
         {
-          name  = "DB_USERNAME"
+          name  = "DBUSER"
           value = var.db_username
+        },
+        {
+          name  = "DBPORT"
+          value = "5432"
         }
       ]
       secrets = [
         {
-          name      = "DB_PASSWORD"
-          valueFrom = format("%s:SecretString:password", var.db_secret_arn)
+          name      = "DBPASS"
+          valueFrom = format("%s:password::", var.db_secret_arn)
         }
       ]
       logConfiguration = {
@@ -167,7 +175,7 @@ resource "aws_ecs_service" "web" {
   cluster          = aws_ecs_cluster.this.id
   desired_count    = var.web_desired_count
   launch_type      = "FARGATE"
-  platform_version = "1.5.0"
+  platform_version = "LATEST"
   task_definition  = aws_ecs_task_definition.web.arn
 
   network_configuration {
@@ -195,7 +203,7 @@ resource "aws_ecs_service" "api" {
   cluster          = aws_ecs_cluster.this.id
   desired_count    = var.api_desired_count
   launch_type      = "FARGATE"
-  platform_version = "1.5.0"
+  platform_version = "LATEST"
   task_definition  = aws_ecs_task_definition.api.arn
 
   network_configuration {
@@ -207,9 +215,7 @@ resource "aws_ecs_service" "api" {
   dynamic "service_registries" {
     for_each = var.api_service_discovery_namespace != "" ? [1] : []
     content {
-      registry_arn   = aws_service_discovery_service.api[0].arn
-      container_name = "api"
-      container_port = var.api_service_port
+      registry_arn = aws_service_discovery_service.api[0].arn
     }
   }
 

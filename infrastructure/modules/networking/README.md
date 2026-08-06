@@ -1,6 +1,6 @@
 # Networking Module
 
-This module creates the AWS networking foundation for the node3tier production architecture.
+This module creates the AWS networking foundation for the toptal production architecture.
 
 ## Purpose
 

@@ -44,11 +44,11 @@ module "secrets_manager" {
 module "iam" {
   source = "../../modules/iam"
 
-  project_name             = var.project_name
-  environment              = var.environment
-  ecr_repository_arns      = [module.ecr.web_repository_arn, module.ecr.api_repository_arn]
-  secret_arns              = [module.secrets_manager.db_secret_arn]
-  tags                     = var.tags
+  project_name        = var.project_name
+  environment         = var.environment
+  ecr_repository_arns = [module.ecr.web_repository_arn, module.ecr.api_repository_arn]
+  secret_arns         = [module.secrets_manager.db_secret_arn]
+  tags                = var.tags
   # OIDC role creation disabled for this deployment
 }
 
@@ -93,8 +93,8 @@ module "ecs" {
   api_security_group_id           = module.security.api_security_group_id
   task_execution_role_arn         = module.iam.task_execution_role_arn
   task_role_arn                   = module.iam.task_role_arn
-  web_image                       = var.web_image
-  api_image                       = var.api_image
+  web_image                       = var.web_image != "" ? var.web_image : format("%s:latest", module.ecr.web_repository_uri)
+  api_image                       = var.api_image != "" ? var.api_image : format("%s:latest", module.ecr.api_repository_uri)
   db_host                         = module.rds.db_endpoint
   db_name                         = var.db_name
   db_username                     = var.db_username
@@ -120,7 +120,6 @@ module "cloudwatch" {
 
   project_name           = var.project_name
   environment            = var.environment
-  log_group_names        = [module.ecs.web_log_group_name, module.ecs.api_log_group_name]
   cluster_name           = module.ecs.cluster_name
   web_service_name       = module.ecs.web_service_name
   api_service_name       = module.ecs.api_service_name
@@ -159,5 +158,4 @@ output "api_repository_uri" {
   description = "ECR repository URI for the API service."
   value       = module.ecr.api_repository_uri
 }
-
 

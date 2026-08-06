@@ -82,19 +82,19 @@ jobs:
 
       - name: Create ECR repositories if missing
         run: |
-          aws ecr describe-repositories --repository-names node3tier-web || aws ecr create-repository --repository-name node3tier-web --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
-          aws ecr describe-repositories --repository-names node3tier-api || aws ecr create-repository --repository-name node3tier-api --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+          aws ecr describe-repositories --repository-names toptal-web || aws ecr create-repository --repository-name toptal-web --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
+          aws ecr describe-repositories --repository-names toptal-api || aws ecr create-repository --repository-name toptal-api --image-scanning-configuration scanOnPush=true --image-tag-mutability MUTABLE
 
       - name: Build and push Web image
         run: |
-          WEB_URI=$(aws ecr describe-repositories --repository-names node3tier-web --query 'repositories[0].repositoryUri' --output text)
+          WEB_URI=$(aws ecr describe-repositories --repository-names toptal-web --query 'repositories[0].repositoryUri' --output text)
           docker build --tag "$WEB_URI:latest" app/web
           docker push "$WEB_URI:latest"
           echo "WEB_IMAGE=$WEB_URI:latest" >> $GITHUB_ENV
 
       - name: Build and push API image
         run: |
-          API_URI=$(aws ecr describe-repositories --repository-names node3tier-api --query 'repositories[0].repositoryUri' --output text)
+          API_URI=$(aws ecr describe-repositories --repository-names toptal-api --query 'repositories[0].repositoryUri' --output text)
           docker build --tag "$API_URI:latest" app/api
           docker push "$API_URI:latest"
           echo "API_IMAGE=$API_URI:latest" >> $GITHUB_ENV

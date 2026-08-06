@@ -22,7 +22,7 @@ variable "db_password" {
 variable "db_name" {
   description = "Database name stored in Secrets Manager."
   type        = string
-  default     = "node3tier"
+  default     = "toptal"
 }
 
 variable "tags" {
