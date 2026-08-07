@@ -18,9 +18,9 @@ output "private_db_subnet_ids" {
   value       = module.networking.private_db_subnet_ids
 }
 
-output "nat_gateway_id" {
-  description = "NAT Gateway ID from networking module."
-  value       = module.networking.nat_gateway_id
+output "nat_gateway_ids" {
+  description = "NAT Gateway IDs (one per AZ) from networking module."
+  value       = module.networking.nat_gateway_ids
 }
 
 output "internet_gateway_id" {

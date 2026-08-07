@@ -1,6 +1,5 @@
 var express = require('express');
 var app = express();
-var uuid = require('node-uuid');
 var Pool = require('pg').Pool;
 
 const conString = {
@@ -9,7 +8,9 @@ const conString = {
     password: process.env.DBPASS,
     host: process.env.DBHOST,
     port: process.env.DBPORT,
-    ssl: { rejectUnauthorized: false }
+    // RDS requires SSL, so it's on by default; local docker-compose Postgres
+    // doesn't speak SSL, so it sets DBSSL=false.
+    ssl: process.env.DBSSL === 'false' ? false : { rejectUnauthorized: false }
 };
 
 // Create the pool once, reuse across requests

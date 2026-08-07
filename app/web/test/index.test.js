@@ -1,13 +1,12 @@
 // test/index.test.js
 // Run with: npx jest
 
-// The route under test calls out to the API service via the `request`
-// package. Mock it so the test doesn't depend on a live API_HOST/network.
-jest.mock('request', () =>
-  jest.fn((options, callback) => {
-    callback(null, { statusCode: 200 }, [
-      { request_uuid: 'test-uuid', time: 'test-time' },
-    ]);
+// The route under test calls out to the API service via global fetch. Mock
+// it so the test doesn't depend on a live API_HOST/network.
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve([{ time: 'test-time' }]),
   })
 );
 

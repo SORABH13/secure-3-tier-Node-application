@@ -25,6 +25,4 @@ locals {
     az   = az
     cidr = var.private_db_subnet_cidrs[idx]
   }]
-
-  nat_subnet_name = local.public_subnets[0].name
 }

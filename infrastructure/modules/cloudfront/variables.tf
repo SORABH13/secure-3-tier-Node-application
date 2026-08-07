@@ -37,6 +37,12 @@ variable "price_class" {
   default     = "PriceClass_100"
 }
 
+variable "web_acl_arn" {
+  description = "ARN of a WAFv2 web ACL (scope=CLOUDFRONT) to attach to the distribution. Leave empty to skip WAF protection."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags applied to CloudFront resources."
   type        = map(string)

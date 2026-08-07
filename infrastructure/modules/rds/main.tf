@@ -41,12 +41,13 @@ resource "aws_db_instance" "this" {
   instance_class            = var.db_instance_class
   allocated_storage         = var.allocated_storage
   storage_encrypted         = true
+  kms_key_id                = var.kms_key_id != "" ? var.kms_key_id : null
   db_name                   = var.db_name
   username                  = var.db_username
   password                  = var.db_password
   db_subnet_group_name      = aws_db_subnet_group.this.name
   vpc_security_group_ids    = var.vpc_security_group_ids
-  multi_az                  = false
+  multi_az                  = var.multi_az
   backup_retention_period   = var.backup_retention_period
   deletion_protection       = var.deletion_protection
   skip_final_snapshot       = var.skip_final_snapshot

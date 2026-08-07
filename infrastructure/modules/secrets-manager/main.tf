@@ -21,7 +21,8 @@ data "aws_secretsmanager_secret" "existing" {
 resource "aws_secretsmanager_secret" "db_credentials" {
   count = var.existing_secret_name == "" ? 1 : 0
 
-  name = format("%s-db-credentials", local.name_prefix)
+  name       = format("%s-db-credentials", local.name_prefix)
+  kms_key_id = var.kms_key_id != "" ? var.kms_key_id : null
 
   tags = merge(local.common_tags, {
     Name = format("%s-db-credentials", local.name_prefix)

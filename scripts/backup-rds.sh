@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # backup-rds.sh -- creates an on-demand RDS snapshot.
-# Automated daily backups are handled by AWS Backup (see infra/terraform/modules/backup),
+# Automated daily backups are handled by AWS Backup (see infrastructure/modules/backup),
 # this script is for on-demand/manual snapshots (e.g. before a risky migration, or to
 # demonstrate the backup mechanism during the interview).
 #

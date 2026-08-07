@@ -29,7 +29,58 @@ env:
   ENVIRONMENT: prod
 
 jobs:
-# Test for application services (API and web) using Jest in CI mode.
+  lint:
+    name: Lint (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web]
+    defaults:
+      run:
+        working-directory: app/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: app/${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  security-scan-deps:
+    name: Dependency security scan (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web]
+    defaults:
+      run:
+        working-directory: app/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: app/${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fails the build on any HIGH/CRITICAL advisory with a known fix. Advisories
+      # with "No fix available" in a transitive dep would still fail here by
+      # design -- see docs/DECISIONS.md for how we handled that (removed the
+      # offending packages rather than suppressing the scan).
+      - name: npm audit
+        run: npm audit --audit-level=high
+
   test:
     name: Test (${{ matrix.service }})
     runs-on: ubuntu-latest
@@ -41,33 +92,36 @@ jobs:
         working-directory: app/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v5
- 
+
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: app/${{ matrix.service }}/package-lock.json
- 
+
       - name: Install dependencies
         run: npm ci
- 
+
       - name: Run tests
         run: npx jest --ci
 
-  build-push-deploy:
-    name: Build, publish, and deploy ECS services
+  build-and-push:
+    name: Build, scan, and publish images
+    needs: [lint, security-scan-deps, test]
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      web_image: ${{ steps.deployment.outputs.web_repository }}
+      api_image: ${{ steps.deployment.outputs.api_repository }}
+      image_tag: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
@@ -81,93 +135,227 @@ jobs:
         run: |
           echo "web_repository=${REGISTRY}/${PROJECT_NAME}-${ENVIRONMENT}-web" >> "$GITHUB_OUTPUT"
           echo "api_repository=${REGISTRY}/${PROJECT_NAME}-${ENVIRONMENT}-api" >> "$GITHUB_OUTPUT"
-          echo "cluster=${PROJECT_NAME}-${ENVIRONMENT}-cluster" >> "$GITHUB_OUTPUT"
-          echo "web_service=${PROJECT_NAME}-${ENVIRONMENT}-web" >> "$GITHUB_OUTPUT"
-          echo "api_service=${PROJECT_NAME}-${ENVIRONMENT}-api" >> "$GITHUB_OUTPUT"
 
-      - name: Confirm ECR repositories exist
-        run: |
-          aws ecr describe-repositories --repository-names \
-            "${PROJECT_NAME}-${ENVIRONMENT}-web" \
-            "${PROJECT_NAME}-${ENVIRONMENT}-api"
+      - name: Build web image
+        env:
+          IMAGE: ${{ steps.deployment.outputs.web_repository }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: docker build --tag "$IMAGE:$IMAGE_TAG" app/web
 
-      - name: Build and push web image
+      - name: Build API image
+        env:
+          IMAGE: ${{ steps.deployment.outputs.api_repository }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: docker build --tag "$IMAGE:$IMAGE_TAG" app/api
+
+      - name: Scan images for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.deployment.outputs.web_repository }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Scan API image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.deployment.outputs.api_repository }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Push web image
         env:
           IMAGE: ${{ steps.deployment.outputs.web_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build --tag "$IMAGE:$IMAGE_TAG" app/web
           docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
           docker push "$IMAGE:$IMAGE_TAG"
           docker push "$IMAGE:latest"
 
-      - name: Build and push API image
+      - name: Push API image
         env:
           IMAGE: ${{ steps.deployment.outputs.api_repository }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build --tag "$IMAGE:$IMAGE_TAG" app/api
           docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
           docker push "$IMAGE:$IMAGE_TAG"
           docker push "$IMAGE:latest"
 
-      - name: Verify ECS services use the expected images
-        if: github.event_name != 'workflow_dispatch' || inputs.deploy
-        env:
-          CLUSTER: ${{ steps.deployment.outputs.cluster }}
-          WEB_SERVICE: ${{ steps.deployment.outputs.web_service }}
-          API_SERVICE: ${{ steps.deployment.outputs.api_service }}
-          WEB_IMAGE: ${{ steps.deployment.outputs.web_repository }}:latest
-          API_IMAGE: ${{ steps.deployment.outputs.api_repository }}:latest
-        run: |
-          get_image() {
-            local service="$1"
-            local container="$2"
-            local task_definition
-            task_definition=$(aws ecs describe-services --cluster "$CLUSTER" --services "$service" --query 'services[0].taskDefinition' --output text)
-            aws ecs describe-task-definition --task-definition "$task_definition" --query "taskDefinition.containerDefinitions[?name=='$container'].image | [0]" --output text
-          }
+  # ---------------------------------------------------------------------
+  # API: internal-only service (no ALB), deploys via ECS-native rolling
+  # update. Captures the previous task definition ARN before touching
+  # anything, so a failed rollout can be rolled back to a known-good
+  # revision instead of the old (broken) rollback step that referenced
+  # undefined outputs.
+  # ---------------------------------------------------------------------
+  deploy-api:
+    name: Deploy API service
+    needs: build-and-push
+    if: github.event_name != 'workflow_dispatch' || inputs.deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLUSTER: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster
+      API_SERVICE: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-api
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-          test "$(get_image "$WEB_SERVICE" web)" = "$WEB_IMAGE"
-          test "$(get_image "$API_SERVICE" api)" = "$API_IMAGE"
-
-      - name: Deploy ECS services
-        if: github.event_name != 'workflow_dispatch' || inputs.deploy
-        env:
-          CLUSTER: ${{ steps.deployment.outputs.cluster }}
-          WEB_SERVICE: ${{ steps.deployment.outputs.web_service }}
-          API_SERVICE: ${{ steps.deployment.outputs.api_service }}
+      - name: Verify API image matches this build
         run: |
-          aws ecs update-service --cluster "$CLUSTER" --service "$WEB_SERVICE" --force-new-deployment
-          aws ecs update-service --cluster "$CLUSTER" --service "$API_SERVICE" --force-new-deployment
-          aws ecs wait services-stable --cluster "$CLUSTER" --services "$WEB_SERVICE" "$API_SERVICE"
-      
-      - name: Rollback on failure
-        if: failure()
+          IMAGE="${{ needs.build-and-push.outputs.api_image }}:${{ needs.build-and-push.outputs.image_tag }}"
+          aws ecr describe-images \
+            --repository-name "${PROJECT_NAME}-${ENVIRONMENT}-api" \
+            --image-ids imageTag=${{ needs.build-and-push.outputs.image_tag }} >/dev/null
+
+      - name: Capture current API task definition (rollback target)
+        id: previous
+        run: |
+          TASK_DEF=$(aws ecs describe-services --cluster "$CLUSTER" --services "$API_SERVICE" --query 'services[0].taskDefinition' --output text)
+          echo "task_def=$TASK_DEF" >> "$GITHUB_OUTPUT"
+
+      - name: Register new API task definition revision
+        id: register
+        run: |
+          aws ecs describe-task-definition --task-definition "${{ steps.previous.outputs.task_def }}" --query 'taskDefinition' > task-def.json
+          NEW_IMAGE="${{ needs.build-and-push.outputs.api_image }}:${{ needs.build-and-push.outputs.image_tag }}"
+          jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            task-def.json > new-task-def.json
+          NEW_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy API service
+        run: |
+          aws ecs update-service --cluster "$CLUSTER" --service "$API_SERVICE" --task-definition "${{ steps.register.outputs.task_def_arn }}"
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$API_SERVICE"
+
+      - name: Rollback API on failure
+        if: failure() && steps.previous.outputs.task_def != ''
         run: |
           echo "Deployment failed -- rolling back to ${{ steps.previous.outputs.task_def }}"
           aws ecs update-service \
-            --cluster "$CLUSTER" --service "$SERVICE" \
-            --task-definition "${{ steps.previous.outputs.task_def }}" \
-            --force-new-deployment
-          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+            --cluster "$CLUSTER" --service "$API_SERVICE" \
+            --task-definition "${{ steps.previous.outputs.task_def }}"
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$API_SERVICE"
           echo "Rollback complete."
           exit 1
-  # -------------------------------------------------------------------
-  # SMOKE TEST -- actually hits the running app, not just a string
-  # comparison of task definition JSON.
-  # -------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------
+  # Web: public, behind the ALB -- deploys via CodeDeploy blue/green with
+  # 10%-canary traffic shifting (CodeDeployDefault.ECSCanary10Percent5Minutes,
+  # configured in infrastructure/modules/codedeploy). Rollback is automatic:
+  # CodeDeploy watches the ALB 5xx/unhealthy-host alarms during the bake
+  # window and shifts traffic back to blue on its own if they trip.
+  # ---------------------------------------------------------------------
+  deploy-web:
+    name: Deploy Web service (blue/green)
+    needs: build-and-push
+    if: github.event_name != 'workflow_dispatch' || inputs.deploy
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLUSTER: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster
+      WEB_SERVICE: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
+      CODEDEPLOY_APP: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
+      CODEDEPLOY_GROUP: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
+    steps:
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register new Web task definition revision
+        id: register
+        run: |
+          CURRENT_TASK_DEF=$(aws ecs describe-services --cluster "$CLUSTER" --services "$WEB_SERVICE" --query 'services[0].taskDefinition' --output text)
+          aws ecs describe-task-definition --task-definition "$CURRENT_TASK_DEF" --query 'taskDefinition' > task-def.json
+          NEW_IMAGE="${{ needs.build-and-push.outputs.web_image }}:${{ needs.build-and-push.outputs.image_tag }}"
+          jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            task-def.json > new-task-def.json
+          NEW_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-def.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=$NEW_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Build AppSpec
+        id: appspec
+        run: |
+          cat > appspec.yaml <<EOF
+          version: 0.0
+          Resources:
+            - TargetService:
+                Type: AWS::ECS::Service
+                Properties:
+                  TaskDefinition: "${{ steps.register.outputs.task_def_arn }}"
+                  LoadBalancerInfo:
+                    ContainerName: "web"
+                    ContainerPort: 3000
+          EOF
+
+      - name: Trigger CodeDeploy blue/green deployment
+        id: deploy
+        run: |
+          jq -n --arg app "$CODEDEPLOY_APP" --arg group "$CODEDEPLOY_GROUP" --arg content "$(cat appspec.yaml)" \
+            '{applicationName: $app, deploymentGroupName: $group, revision: {revisionType: "AppSpecContent", appSpecContent: {content: $content}}}' \
+            > deployment-input.json
+          DEPLOYMENT_ID=$(aws deploy create-deployment --cli-input-json file://deployment-input.json --query 'deploymentId' --output text)
+          echo "Deployment started: $DEPLOYMENT_ID"
+          echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for blue/green deployment to succeed
+        run: aws deploy wait deployment-successful --deployment-id "${{ steps.deploy.outputs.deployment_id }}"
+
+      # Backstop: CodeDeploy already auto-rolls-back on DEPLOYMENT_FAILURE or
+      # the ALB alarms tripping (see auto_rollback_configuration in the
+      # codedeploy module). This makes the intent explicit in CI logs and
+      # covers the case where the wait itself times out mid-deployment.
+      - name: Stop and roll back deployment on failure
+        if: failure() && steps.deploy.outputs.deployment_id != ''
+        run: |
+          echo "Deployment failed or timed out -- stopping with rollback."
+          aws deploy stop-deployment --deployment-id "${{ steps.deploy.outputs.deployment_id }}" --auto-rollback-enabled
+          exit 1
+
+  # ---------------------------------------------------------------------
+  # SMOKE TEST -- hits the real ALB DNS name (resolved dynamically, not
+  # hardcoded) and checks for a real rendered page, not just a 200. The web
+  # route calls the API on every request, so a successful render proves both
+  # tiers are healthy end to end. (The API has no public ALB route of its
+  # own -- it's only reachable via internal service discovery from web -- so
+  # curling an "/api/status" path on the ALB would just 404 against the web
+  # app; this is the architecturally correct check.)
+  # ---------------------------------------------------------------------
   smoke-test:
     name: Smoke test
-    needs: build-push-deploy
+    needs: [deploy-api, deploy-web]
     runs-on: ubuntu-latest
+    environment: production
     steps:
-      - name: Hit web and api endpoints
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve ALB DNS name
+        id: alb
         run: |
-          sleep 15
-          curl -f http://toptal-prod-alb-1538163913.us-east-1.elb.amazonaws.com/ \
-            || (echo "web smoke test failed" && exit 1)
-          # curl -f http://toptal-prod-alb-1538163913.us-east-1.elb.amazonaws.com/api/status \
-          #   || (echo "api smoke test failed" && exit 1)
-          echo "Smoke tests passed."
-           
+          DNS=$(aws elbv2 describe-load-balancers --names "${PROJECT_NAME}-${ENVIRONMENT}-alb" --query 'LoadBalancers[0].DNSName' --output text)
+          echo "dns=$DNS" >> "$GITHUB_OUTPUT"
+
+      - name: Hit web (which calls api) end to end
+        run: |
+          for i in 1 2 3 4 5; do
+            BODY=$(curl -fs "http://${{ steps.alb.outputs.dns }}/") && break
+            echo "attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "$BODY" | grep -q "Welcome" || (echo "smoke test failed: unexpected response body" && echo "$BODY" && exit 1)
+          echo "Smoke test passed: web rendered a page using a live API response."

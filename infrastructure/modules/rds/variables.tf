@@ -48,6 +48,18 @@ variable "db_name" {
   default     = "toptal"
 }
 
+variable "kms_key_id" {
+  description = "KMS CMK ARN used to encrypt RDS storage. Leave empty to use the AWS-managed default RDS key."
+  type        = string
+  default     = ""
+}
+
+variable "multi_az" {
+  description = "Deploy a synchronous standby in a second AZ for automatic failover on instance/AZ failure."
+  type        = bool
+  default     = true
+}
+
 variable "db_instance_class" {
   description = "RDS instance class for PostgreSQL."
   type        = string

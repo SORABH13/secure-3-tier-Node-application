@@ -3,6 +3,11 @@ output "db_instance_identifier" {
   value       = aws_db_instance.this.id
 }
 
+output "db_instance_arn" {
+  description = "ARN of the RDS instance, used by the AWS Backup selection."
+  value       = aws_db_instance.this.arn
+}
+
 output "db_endpoint" {
   description = "Endpoint address of the PostgreSQL instance."
   value       = aws_db_instance.this.address

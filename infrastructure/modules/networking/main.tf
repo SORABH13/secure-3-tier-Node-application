@@ -16,23 +16,28 @@ resource "aws_internet_gateway" "this" {
   })
 }
 
+# One NAT Gateway per AZ so a single AZ failure cannot take down outbound
+# internet access (ECR pulls, Secrets Manager calls) for every private subnet.
 resource "aws_eip" "nat" {
-  count  = var.nat_gateway_allocation_id == "" ? 1 : 0
+  for_each = { for subnet in local.public_subnets : subnet.az => subnet }
+
   domain = "vpc"
 
   depends_on = [aws_internet_gateway.this]
 
   tags = merge(local.common_tags, {
-    Name = format("%s-nat-eip", local.name_prefix)
+    Name = format("%s-nat-eip-%s", local.name_prefix, each.key)
   })
 }
 
 resource "aws_nat_gateway" "this" {
-  allocation_id = var.nat_gateway_allocation_id != "" ? var.nat_gateway_allocation_id : aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[local.nat_subnet_name].id
+  for_each = { for subnet in local.public_subnets : subnet.az => subnet }
+
+  allocation_id = aws_eip.nat[each.key].id
+  subnet_id     = aws_subnet.public[each.value.name].id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-nat-gateway", local.name_prefix)
+    Name = format("%s-nat-gateway-%s", local.name_prefix, each.key)
   })
 
   depends_on = [aws_internet_gateway.this]
@@ -95,17 +100,21 @@ resource "aws_route" "public_internet_access" {
 }
 
 resource "aws_route_table" "private_app" {
+  for_each = { for subnet in local.public_subnets : subnet.az => subnet }
+
   vpc_id = aws_vpc.this.id
 
   tags = merge(local.common_tags, {
-    Name = format("%s-private-app-rt", local.name_prefix)
+    Name = format("%s-private-app-rt-%s", local.name_prefix, each.key)
   })
 }
 
 resource "aws_route" "private_app_nat" {
-  route_table_id         = aws_route_table.private_app.id
+  for_each = aws_route_table.private_app
+
+  route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.this.id
+  nat_gateway_id         = aws_nat_gateway.this[each.key].id
 }
 
 resource "aws_route_table" "private_db" {
@@ -127,7 +136,7 @@ resource "aws_route_table_association" "private_app" {
   for_each = aws_subnet.private_app
 
   subnet_id      = each.value.id
-  route_table_id = aws_route_table.private_app.id
+  route_table_id = aws_route_table.private_app[each.value.availability_zone].id
 }
 
 resource "aws_route_table_association" "private_db" {

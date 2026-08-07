@@ -68,12 +68,6 @@ variable "tags" {
   default     = {}
 }
 
-variable "nat_gateway_allocation_id" {
-  description = "Optional existing Elastic IP allocation ID for NAT Gateway."
-  type        = string
-  default     = ""
-}
-
 locals {
   subnet_count_equal = length(var.availability_zones) == length(var.public_subnet_cidrs) && length(var.availability_zones) == length(var.private_app_subnet_cidrs) && length(var.availability_zones) == length(var.private_db_subnet_cidrs)
 }

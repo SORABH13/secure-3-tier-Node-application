@@ -49,3 +49,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "alert_email" {
+  description = "Email address subscribed to the alerts SNS topic. Leave empty to skip the email subscription (e.g. wire a PagerDuty/Opsgenie HTTPS endpoint instead)."
+  type        = string
+  default     = ""
+}
+
+variable "web_desired_count" {
+  description = "Desired task count for the Web ECS service, used to size the healthy-host alarm threshold."
+  type        = number
+  default     = 2
+}
+
+variable "api_desired_count" {
+  description = "Desired task count for the API ECS service, used to size the healthy-host alarm threshold."
+  type        = number
+  default     = 2
+}

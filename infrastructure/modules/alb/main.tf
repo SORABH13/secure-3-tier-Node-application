@@ -21,6 +21,11 @@ resource "aws_lb" "this" {
   })
 }
 
+# Kept as the original name/address ("web", not "web_blue") so this stays the
+# same target group already attached to the live ALB listener and ECS
+# service -- renaming it would force a replacement (target group `name` is
+# immutable) and detach live traffic. It plays the "blue" role in the
+# CodeDeploy blue/green deployment group below.
 resource "aws_lb_target_group" "web" {
   name        = format("%s-web-tg", local.name_prefix)
   port        = var.target_group_port
@@ -40,6 +45,33 @@ resource "aws_lb_target_group" "web" {
 
   tags = merge(local.common_tags, {
     Name = format("%s-web-tg", local.name_prefix)
+  })
+}
+
+# CodeDeploy blue/green target group for the Web ECS service. CodeDeploy
+# shifts the listener's forward rule between "web" (blue) and "web_green"
+# on each deployment -- Terraform only owns their existence, not which one is
+# currently live (see the ecs module's lifecycle.ignore_changes on the
+# service's load_balancer block).
+resource "aws_lb_target_group" "web_green" {
+  name        = format("%s-web-tg-green", local.name_prefix)
+  port        = var.target_group_port
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+
+  health_check {
+    path                = var.health_check_path
+    protocol            = "HTTP"
+    matcher             = "200-399"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+
+  tags = merge(local.common_tags, {
+    Name = format("%s-web-tg-green", local.name_prefix)
   })
 }
 

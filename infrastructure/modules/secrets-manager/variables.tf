@@ -25,6 +25,12 @@ variable "db_name" {
   default     = "toptal"
 }
 
+variable "kms_key_id" {
+  description = "KMS CMK ARN used to encrypt a newly created secret. Ignored when reusing an existing secret. Leave empty to use the AWS-managed default Secrets Manager key."
+  type        = string
+  default     = ""
+}
+
 variable "existing_secret_name" {
   description = "Existing active secret name to reuse instead of creating a new secret."
   type        = string

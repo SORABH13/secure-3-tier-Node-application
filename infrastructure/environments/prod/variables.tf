@@ -64,12 +64,6 @@ variable "db_username" {
   default     = "toptaladmin"
 }
 
-variable "db_password" {
-  description = "Master database password."
-  type        = string
-  sensitive   = true
-}
-
 variable "existing_db_secret_name" {
   description = "Existing active Secrets Manager secret name to reuse for database credentials."
   type        = string
@@ -161,4 +155,58 @@ variable "tags" {
     Project     = "toptal"
     Environment = "prod"
   }
+}
+
+variable "web_desired_count" {
+  description = "Desired task count for the Web ECS service."
+  type        = number
+  default     = 2
+}
+
+variable "api_desired_count" {
+  description = "Desired task count for the API ECS service."
+  type        = number
+  default     = 2
+}
+
+variable "alert_email" {
+  description = "Email address subscribed to the CloudWatch alarms SNS topic. Leave empty to skip (wire a PagerDuty/Opsgenie HTTPS endpoint for real production paging)."
+  type        = string
+  default     = ""
+}
+
+variable "backup_retention_days" {
+  description = "Number of days AWS Backup retains each RDS recovery point."
+  type        = number
+  default     = 35
+}
+
+variable "backup_schedule" {
+  description = "Cron expression (AWS Backup syntax) for the daily backup job."
+  type        = string
+  default     = "cron(0 7 * * ? *)"
+}
+
+variable "enable_github_oidc" {
+  description = "Create the GitHub Actions OIDC provider and deploy/terraform IAM roles."
+  type        = bool
+  default     = true
+}
+
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the OIDC roles, in \"org/repo\" form. Leave empty to skip OIDC role creation entirely."
+  type        = string
+  default     = "SORABH13/secure-3-tier-Node-application"
+}
+
+variable "github_allowed_refs" {
+  description = "Branches allowed to assume the OIDC roles. Must include every branch either workflow's trigger runs on -- infra.yml currently also triggers on feature/project-analysis; drop it here once that branch is merged/deleted."
+  type        = list(string)
+  default     = ["master", "feature/project-analysis"]
+}
+
+variable "waf_rate_limit" {
+  description = "Max requests from a single IP per 5-minute window before the CloudFront WAF rate-based rule blocks it."
+  type        = number
+  default     = 2000
 }

@@ -18,9 +18,9 @@ output "private_db_subnet_ids" {
   value       = [for subnet in aws_subnet.private_db : subnet.id]
 }
 
-output "nat_gateway_id" {
-  description = "NAT Gateway ID for outbound traffic from private application subnets."
-  value       = aws_nat_gateway.this.id
+output "nat_gateway_ids" {
+  description = "NAT Gateway IDs, one per Availability Zone, for outbound traffic from private application subnets."
+  value       = { for az, nat in aws_nat_gateway.this : az => nat.id }
 }
 
 output "internet_gateway_id" {

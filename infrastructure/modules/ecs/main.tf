@@ -16,6 +16,13 @@ locals {
 resource "aws_ecs_cluster" "this" {
   name = local.cluster_name_local
 
+  # Required for the RunningTaskCount / per-service CPU-Memory metrics used
+  # by the CloudWatch alarms and dashboard.
+  setting {
+    name  = "containerInsights"
+    value = "enabled"
+  }
+
   tags = merge(local.common_tags, {
     Name = local.cluster_name_local
   })
@@ -170,6 +177,12 @@ resource "aws_ecs_task_definition" "api" {
 
 data "aws_region" "current" {}
 
+# Web sits behind the ALB and is user-facing, so it deploys through
+# CodeDeploy blue/green (see the codedeploy module) rather than ECS-native
+# rolling deployment. Terraform only creates the service and its initial
+# "blue" wiring; CodeDeploy owns task_definition/load_balancer afterwards, so
+# both are ignored here to avoid Terraform reverting a CodeDeploy-driven
+# deployment on the next apply.
 resource "aws_ecs_service" "web" {
   name             = format("%s-web", local.name_prefix)
   cluster          = aws_ecs_cluster.this.id
@@ -184,20 +197,29 @@ resource "aws_ecs_service" "web" {
     assign_public_ip = false
   }
 
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
+
   load_balancer {
     target_group_arn = var.target_group_arn
     container_name   = "web"
     container_port   = var.web_service_port
   }
 
-  deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = 100
+  lifecycle {
+    ignore_changes = [task_definition, load_balancer]
+  }
 
   tags = merge(local.common_tags, {
     Name = format("%s-web-service", local.name_prefix)
   })
 }
 
+# API is internal-only (service discovery, no ALB), so CodeDeploy's
+# load-balancer-based traffic shifting doesn't apply -- it uses ECS-native
+# rolling deployment instead (100% minimum healthy, so old tasks stay up
+# until new ones pass health checks -- zero downtime, just not blue/green).
 resource "aws_ecs_service" "api" {
   name             = format("%s-api", local.name_prefix)
   cluster          = aws_ecs_cluster.this.id
