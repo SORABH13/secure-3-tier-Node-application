@@ -31,7 +31,10 @@ jobs:
         with:
           working_directory: infrastructure
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          additional_args: --config-file .tfsec/config.yml
+          # tfsec-action cd's into $GITHUB_WORKSPACE (repo root), not
+          # working_directory, then passes working_directory as tfsec's scan
+          # target -- so additional_args paths resolve from the repo root too.
+          additional_args: --config-file infrastructure/.tfsec/config.yml
 
   terraform-plan:
     name: Terraform Plan
