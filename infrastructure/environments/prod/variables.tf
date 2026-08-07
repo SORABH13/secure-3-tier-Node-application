@@ -199,11 +199,6 @@ variable "github_repository" {
   default     = "SORABH13/secure-3-tier-Node-application"
 }
 
-variable "github_allowed_refs" {
-  description = "Branches allowed to assume the OIDC roles. Must include every branch either workflow's trigger runs on -- infra.yml currently also triggers on feature/project-analysis; drop it here once that branch is merged/deleted."
-  type        = list(string)
-  default     = ["master", "feature/project-analysis"]
-}
 
 variable "waf_rate_limit" {
   description = "Max requests from a single IP per 5-minute window before the CloudFront WAF rate-based rule blocks it."

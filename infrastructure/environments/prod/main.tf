@@ -65,7 +65,6 @@ module "iam" {
   secret_arns         = [module.secrets_manager.db_secret_arn]
   enable_github_oidc  = var.enable_github_oidc
   github_repository   = var.github_repository
-  github_allowed_refs = var.github_allowed_refs
   tags                = var.tags
 }
 
