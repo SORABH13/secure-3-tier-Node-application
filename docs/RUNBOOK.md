@@ -78,4 +78,13 @@ terraform taint random_password.db
 terraform apply -var-file=terraform.tfvars
 ```
 
-Terraform generates a new password, updates the RDS instance in place, and writes a new Secrets Manager secret version. Redeploy the API service afterward so running tasks pick up the new secret (`aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment`).
+Terraform generates a new password, updates the RDS instance in place, and writes a new Secrets Manager secret version.
+
+**Redeploy the API service afterward, always.** ECS resolves the `DBPASS` secret from Secrets Manager only at task launch time, not on already-running tasks -- so any rotation (this one, or an incidental one from an unrelated `terraform apply` that happens to touch `random_password.db`) leaves running API tasks holding the *old* password in memory, and every DB query starts failing with `password authentication failed` even though the apply itself reported success. This exact scenario happened during initial rollout of this pipeline (2026-08-07) and caused a real, if brief, outage before it was caught and redeployed manually.
+
+`infra.yml`'s `terraform-apply` job now runs `aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment` automatically after every apply (idempotent -- harmless when the secret didn't change), so this shouldn't recur via CI. Manual applies (`terraform apply` run locally) still need the same manual step:
+
+```sh
+aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment
+aws ecs wait services-stable --cluster toptal-prod-cluster --services toptal-prod-api
+```

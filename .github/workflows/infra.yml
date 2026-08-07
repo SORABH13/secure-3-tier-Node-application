@@ -136,3 +136,16 @@ jobs:
       - name: Terraform apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -input=false tfplan
+
+      # ECS resolves the DBPASS secret from Secrets Manager only at task
+      # launch, not on a running task -- so whenever this apply rotates
+      # random_password.db, already-running API tasks keep the *old*
+      # password in memory and start failing DB auth, even though the
+      # apply itself succeeds. Forcing a redeploy here is cheap and
+      # idempotent (harmless when the secret didn't change), and closes
+      # this outage window automatically instead of relying on a human to
+      # remember the manual step documented in docs/RUNBOOK.md.
+      - name: Redeploy API to pick up any rotated secret
+        run: |
+          aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster toptal-prod-cluster --services toptal-prod-api
