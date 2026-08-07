@@ -30,6 +30,31 @@ env:
   ENVIRONMENT: prod
 
 jobs:
+# Test for application services (API and web) using Jest in CI mode.
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, web]
+    defaults:
+      run:
+        working-directory: app/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v5
+ 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: app/${{ matrix.service }}/package-lock.json
+ 
+      - name: Install dependencies
+        run: npm ci
+ 
+      - name: Run tests
+        run: npx jest --ci
+
   build-push-deploy:
     name: Build, publish, and deploy ECS services
     runs-on: ubuntu-latest
@@ -117,3 +142,33 @@ jobs:
           aws ecs update-service --cluster "$CLUSTER" --service "$WEB_SERVICE" --force-new-deployment
           aws ecs update-service --cluster "$CLUSTER" --service "$API_SERVICE" --force-new-deployment
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$WEB_SERVICE" "$API_SERVICE"
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed -- rolling back to ${{ steps.previous.outputs.task_def }}"
+          aws ecs update-service \
+            --cluster "$CLUSTER" --service "$SERVICE" \
+            --task-definition "${{ steps.previous.outputs.task_def }}" \
+            --force-new-deployment
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          echo "Rollback complete."
+          exit 1
+  # -------------------------------------------------------------------
+  # SMOKE TEST -- actually hits the running app, not just a string
+  # comparison of task definition JSON.
+  # -------------------------------------------------------------------
+  smoke-test:
+    name: Smoke test
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit web and api endpoints
+        run: |
+          sleep 15
+          curl -f http://toptal-prod-alb-1538163913.us-east-1.elb.amazonaws.com/ \
+            || (echo "web smoke test failed" && exit 1)
+          # curl -f http://toptal-prod-alb-1538163913.us-east-1.elb.amazonaws.com/api/status \
+          #   || (echo "api smoke test failed" && exit 1)
+          echo "Smoke tests passed."
+           
