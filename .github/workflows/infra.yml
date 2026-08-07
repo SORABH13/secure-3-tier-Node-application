@@ -43,6 +43,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      # terraform.tfvars is gitignored on purpose (it used to hold a
+      # plaintext DB password before random_password.db took over -- see
+      # main.tf). Every remaining value in it is non-sensitive and identical
+      # to terraform.tfvars.example, so CI just uses the example directly
+      # rather than needing a secret-backed copy of the file.
+      - name: Prepare tfvars
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: cp terraform.tfvars.example terraform.tfvars
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
