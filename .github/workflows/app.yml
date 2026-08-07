@@ -149,7 +149,7 @@ jobs:
         run: docker build --tag "$IMAGE:$IMAGE_TAG" app/api
 
       - name: Scan images for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ steps.deployment.outputs.web_repository }}:${{ github.sha }}
@@ -158,7 +158,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Scan API image for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
           image-ref: ${{ steps.deployment.outputs.api_repository }}:${{ github.sha }}
