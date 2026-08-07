@@ -5,9 +5,9 @@ on:
     branches:
       - master
       - feature/project-analysis
-  paths:
+    paths:
       - "infrastructure/**"
-      - ".github/workflows/infra.yml"    
+      - ".github/workflows/infra.yml"
   workflow_dispatch: {}
 
 permissions:
