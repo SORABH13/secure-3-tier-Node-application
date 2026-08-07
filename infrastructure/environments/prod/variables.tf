@@ -130,6 +130,12 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "alb_health_check_path" {
+  description = "A lightweight Web endpoint or static asset that returns HTTP 200 without calling the API."
+  type        = string
+  default     = "/stylesheets/style.css"
+}
+
 variable "cloudfront_aliases" {
   description = "Optional CloudFront aliases."
   type        = list(string)

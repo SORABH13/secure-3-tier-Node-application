@@ -82,6 +82,7 @@ module "alb" {
   subnet_ids        = module.networking.public_subnet_ids
   security_group_id = module.security.alb_security_group_id
   certificate_arn   = var.certificate_arn
+  health_check_path = var.alb_health_check_path
   tags              = var.tags
 }
 
