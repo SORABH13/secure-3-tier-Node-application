@@ -29,3 +29,9 @@ variable "image_tag_mutability" {
   type        = string
   default     = "MUTABLE"
 }
+
+variable "force_delete" {
+  description = "Allow deletion of repositories that still contain images. Intended only for teardown."
+  type        = bool
+  default     = false
+}

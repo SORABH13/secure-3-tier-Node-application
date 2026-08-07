@@ -10,9 +10,10 @@ private_db_subnet_cidrs  = ["10.0.21.0/24", "10.0.22.0/24"]
 alb_ingress_cidrs        = ["0.0.0.0/0"]
 alb_ingress_ipv6_cidrs   = ["::/0"]
 
-db_username = "toptaladmin"
-db_password = "5b8c4acfc69403bf46c79fdf870dee4151d49a35"
-db_name     = "toptal"
+db_username             = "toptaladmin"
+db_password             = "5b8c4acfc69403bf46c79fdf870dee4151d49a35"
+db_name                 = "toptal"
+existing_db_secret_name = "toptal-prod-db-credentials"
 
 db_instance_class       = "db.t4g.micro"
 allocated_storage       = 20

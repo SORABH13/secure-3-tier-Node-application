@@ -1,9 +1,9 @@
 output "db_secret_arn" {
   description = "ARN of the database credentials secret."
-  value       = aws_secretsmanager_secret.db_credentials.arn
+  value       = local.secret_arn
 }
 
 output "db_secret_name" {
   description = "Name of the database credentials secret."
-  value       = aws_secretsmanager_secret.db_credentials.name
+  value       = local.secret_name
 }

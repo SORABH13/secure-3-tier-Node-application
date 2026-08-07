@@ -70,6 +70,12 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "existing_db_secret_name" {
+  description = "Existing active Secrets Manager secret name to reuse for database credentials."
+  type        = string
+  default     = ""
+}
+
 variable "db_name" {
   description = "Initial database name."
   type        = string
@@ -104,6 +110,18 @@ variable "deletion_protection" {
   description = "Enable deletion protection for RDS."
   type        = bool
   default     = true
+}
+
+variable "skip_final_snapshot" {
+  description = "Skip the final RDS snapshot during teardown."
+  type        = bool
+  default     = false
+}
+
+variable "ecr_force_delete" {
+  description = "Delete ECR repositories even when they contain images. Intended only for teardown."
+  type        = bool
+  default     = false
 }
 
 variable "certificate_arn" {

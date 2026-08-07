@@ -28,17 +28,19 @@ module "ecr" {
   project_name = var.project_name
   environment  = var.environment
   tags         = var.tags
+  force_delete = var.ecr_force_delete
 }
 
 module "secrets_manager" {
   source = "../../modules/secrets-manager"
 
-  project_name = var.project_name
-  environment  = var.environment
-  db_username  = var.db_username
-  db_password  = var.db_password
-  db_name      = var.db_name
-  tags         = var.tags
+  project_name         = var.project_name
+  environment          = var.environment
+  db_username          = var.db_username
+  db_password          = var.db_password
+  db_name              = var.db_name
+  existing_secret_name = var.existing_db_secret_name
+  tags                 = var.tags
 }
 
 module "iam" {
@@ -65,6 +67,7 @@ module "rds" {
   engine_version          = var.engine_version
   backup_retention_period = var.backup_retention_period
   deletion_protection     = var.deletion_protection
+  skip_final_snapshot     = var.skip_final_snapshot
   db_subnet_ids           = module.networking.private_db_subnet_ids
   vpc_security_group_ids  = [module.security.postgres_security_group_id]
   tags                    = var.tags
@@ -158,4 +161,3 @@ output "api_repository_uri" {
   description = "ECR repository URI for the API service."
   value       = module.ecr.api_repository_uri
 }
-

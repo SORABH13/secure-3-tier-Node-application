@@ -49,8 +49,8 @@ resource "aws_db_instance" "this" {
   multi_az                  = false
   backup_retention_period   = var.backup_retention_period
   deletion_protection       = var.deletion_protection
-  skip_final_snapshot       = false
-  final_snapshot_identifier = format("%s-final-snapshot", local.name_prefix)
+  skip_final_snapshot       = var.skip_final_snapshot
+  final_snapshot_identifier = var.skip_final_snapshot ? null : format("%s-final-snapshot", local.name_prefix)
   copy_tags_to_snapshot     = true
   publicly_accessible       = false
   parameter_group_name      = aws_db_parameter_group.this.name

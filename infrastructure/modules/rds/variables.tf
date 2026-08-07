@@ -92,6 +92,12 @@ variable "deletion_protection" {
   default     = true
 }
 
+variable "skip_final_snapshot" {
+  description = "Skip the final snapshot when destroying the RDS instance. Intended only for teardown."
+  type        = bool
+  default     = false
+}
+
 variable "db_subnet_ids" {
   description = "List of private DB subnet IDs for the RDS subnet group."
   type        = list(string)

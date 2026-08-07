@@ -25,6 +25,12 @@ variable "db_name" {
   default     = "toptal"
 }
 
+variable "existing_secret_name" {
+  description = "Existing active secret name to reuse instead of creating a new secret."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags applied to Secrets Manager resources."
   type        = map(string)
