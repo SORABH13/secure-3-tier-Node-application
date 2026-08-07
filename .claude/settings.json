@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(command -v actionlint)",
+      "Bash(actionlint .github/workflows/app.yml)",
+      "Bash(python3 -c \"import yaml,sys; yaml.safe_load\\(open\\('.github/workflows/app.yml'\\)\\); print\\('YAML OK'\\)\")"
+    ]
+  }
+}

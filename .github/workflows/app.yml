@@ -160,7 +160,7 @@ jobs:
   # -------------------------------------------------------------------
   smoke-test:
     name: Smoke test
-    needs: deploy
+    needs: build-push-deploy
     runs-on: ubuntu-latest
     steps:
       - name: Hit web and api endpoints
