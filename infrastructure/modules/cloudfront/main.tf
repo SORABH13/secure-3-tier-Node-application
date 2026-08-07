@@ -8,6 +8,17 @@ locals {
   })
 }
 
+#tfsec:ignore:aws-cloudfront-use-secure-tls-policy -- when certificate_arn
+# is unset, the second viewer_certificate block below falls back to
+# cloudfront_default_certificate, which AWS hard-locks to TLSv1 regardless
+# of what's configured here -- there's no minimum_protocol_version to raise
+# without a real ACM cert + alias. Set certificate_arn to fix.
+#tfsec:ignore:aws-cloudfront-enable-logging -- access logging isn't wired up
+# here (legacy S3/ACL-based delivery is fragile to stand up correctly without
+# a live apply to verify); CloudTrail (API audit) and CloudWatch Logs
+# (application logs) already cover this project's logging requirement. A
+# follow-up would move to CloudFront's newer vended-logs-to-S3-via-delivery
+# source model instead of the legacy ACL grant.
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   default_root_object = ""
@@ -19,6 +30,10 @@ resource "aws_cloudfront_distribution" "this" {
     origin_id   = format("%s-alb-origin", local.name_prefix)
     origin_path = var.origin_path
 
+    #tfsec:ignore:aws-cloudfront-use-secure-tls-policy -- origin_protocol_policy
+    # tracks certificate_arn: falls back to http-only only when no ACM cert is
+    # configured yet (see terraform.tfvars.example). Set certificate_arn to
+    # get https-only automatically, no code change needed.
     custom_origin_config {
       http_port              = 80
       https_port             = 443

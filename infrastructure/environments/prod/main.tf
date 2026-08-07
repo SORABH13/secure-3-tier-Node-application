@@ -20,6 +20,7 @@ module "networking" {
   public_subnet_cidrs      = var.public_subnet_cidrs
   private_app_subnet_cidrs = var.private_app_subnet_cidrs
   private_db_subnet_cidrs  = var.private_db_subnet_cidrs
+  kms_key_arn              = module.kms.data_key_arn
   tags                     = var.tags
 }
 
@@ -121,6 +122,7 @@ module "ecs" {
   api_service_discovery_namespace = format("%s-%s.local", var.project_name, var.environment)
   web_desired_count               = var.web_desired_count
   api_desired_count               = var.api_desired_count
+  kms_key_arn                     = module.kms.data_key_arn
   tags                            = var.tags
 }
 
@@ -167,6 +169,7 @@ module "cloudwatch" {
   alert_email            = var.alert_email
   web_desired_count      = var.web_desired_count
   api_desired_count      = var.api_desired_count
+  kms_key_arn            = module.kms.data_key_arn
   tags                   = var.tags
 }
 
@@ -187,10 +190,11 @@ module "codedeploy" {
 module "cloudtrail" {
   source = "../../modules/cloudtrail"
 
-  project_name = var.project_name
-  environment  = var.environment
-  kms_key_arn  = module.kms.cloudtrail_key_arn
-  tags         = var.tags
+  project_name          = var.project_name
+  environment           = var.environment
+  kms_key_arn           = module.kms.cloudtrail_key_arn
+  log_group_kms_key_arn = module.kms.data_key_arn
+  tags                  = var.tags
 }
 
 module "backup" {

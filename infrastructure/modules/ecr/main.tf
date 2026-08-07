@@ -5,6 +5,10 @@ resource "aws_ecr_repository" "web" {
   image_scanning_configuration {
     scan_on_push = true
   }
+  encryption_configuration {
+    encryption_type = var.kms_key_arn != "" ? "KMS" : "AES256"
+    kms_key         = var.kms_key_arn != "" ? var.kms_key_arn : null
+  }
 
   tags = merge(var.tags, {
     Name        = format("%s-%s-web", var.project_name, var.environment)
@@ -41,6 +45,10 @@ resource "aws_ecr_repository" "api" {
   force_delete         = var.force_delete
   image_scanning_configuration {
     scan_on_push = true
+  }
+  encryption_configuration {
+    encryption_type = var.kms_key_arn != "" ? "KMS" : "AES256"
+    kms_key         = var.kms_key_arn != "" ? var.kms_key_arn : null
   }
 
   tags = merge(var.tags, {

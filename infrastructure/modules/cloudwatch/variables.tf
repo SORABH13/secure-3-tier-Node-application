@@ -50,6 +50,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt the SNS alerts topic. Leave empty to use SNS's default encryption."
+  type        = string
+  default     = ""
+}
+
 variable "alert_email" {
   description = "Email address subscribed to the alerts SNS topic. Leave empty to skip the email subscription (e.g. wire a PagerDuty/Opsgenie HTTPS endpoint instead)."
   type        = string

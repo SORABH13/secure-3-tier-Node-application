@@ -30,6 +30,8 @@ jobs:
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: infrastructure
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          additional_args: --config-file .tfsec/config.yml
 
   terraform-plan:
     name: Terraform Plan

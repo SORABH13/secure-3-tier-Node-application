@@ -43,13 +43,18 @@ resource "aws_nat_gateway" "this" {
   depends_on = [aws_internet_gateway.this]
 }
 
+# map_public_ip_on_launch is off even here: nothing is ever launched directly
+# into these subnets with an auto-assigned public IP (the ALB and NAT
+# Gateways get their public-facing addresses via their own ENIs/EIPs, not
+# this setting). Leaving it off is a free defense-in-depth measure against
+# something being placed here by accident later.
 resource "aws_subnet" "public" {
   for_each = { for subnet in local.public_subnets : subnet.name => subnet }
 
   vpc_id                  = aws_vpc.this.id
   cidr_block              = each.value.cidr
   availability_zone       = each.value.az
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = merge(local.common_tags, {
     Name       = each.value.name
@@ -144,4 +149,66 @@ resource "aws_route_table_association" "private_db" {
 
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private_db.id
+}
+
+# --- VPC Flow Logs: network-level audit trail, complements CloudTrail
+# (API-level audit) and the application CloudWatch Logs. ---
+
+resource "aws_cloudwatch_log_group" "flow_log" {
+  name              = format("/vpc/%s-flow-log", local.name_prefix)
+  retention_in_days = var.flow_log_retention_days
+  kms_key_id        = var.kms_key_arn != "" ? var.kms_key_arn : null
+
+  tags = merge(local.common_tags, {
+    Name = format("%s-flow-log", local.name_prefix)
+  })
+}
+
+data "aws_iam_policy_document" "flow_log_assume_role" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["vpc-flow-logs.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
+  }
+}
+
+resource "aws_iam_role" "flow_log" {
+  name               = format("%s-flow-log-role", local.name_prefix)
+  assume_role_policy = data.aws_iam_policy_document.flow_log_assume_role.json
+
+  tags = local.common_tags
+}
+
+data "aws_iam_policy_document" "flow_log_publish" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+    ]
+    resources = [format("%s:*", aws_cloudwatch_log_group.flow_log.arn)]
+  }
+}
+
+resource "aws_iam_role_policy" "flow_log_publish" {
+  name   = format("%s-flow-log-publish", local.name_prefix)
+  role   = aws_iam_role.flow_log.id
+  policy = data.aws_iam_policy_document.flow_log_publish.json
+}
+
+resource "aws_flow_log" "this" {
+  vpc_id               = aws_vpc.this.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.flow_log.arn
+  iam_role_arn         = aws_iam_role.flow_log.arn
+
+  tags = merge(local.common_tags, {
+    Name = format("%s-flow-log", local.name_prefix)
+  })
 }

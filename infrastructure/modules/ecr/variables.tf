@@ -25,13 +25,19 @@ variable "tags" {
 }
 
 variable "image_tag_mutability" {
-  description = "Image tag mutability for ECR repositories."
+  description = "Image tag mutability for ECR repositories. Immutable by default -- deploys always reference a specific commit-SHA tag registered in the task definition, never :latest, so nothing needs to overwrite an existing tag."
   type        = string
-  default     = "MUTABLE"
+  default     = "IMMUTABLE"
 }
 
 variable "force_delete" {
   description = "Allow deletion of repositories that still contain images. Intended only for teardown."
   type        = bool
   default     = false
+}
+
+variable "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt ECR repository images. Leave empty to use AES256 (ECR's default)."
+  type        = string
+  default     = ""
 }

@@ -166,23 +166,21 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
+      # Repos are immutable-tag (see infrastructure/modules/ecr) -- only the
+      # commit-SHA tag is pushed. Nothing reads ":latest": both deploy jobs
+      # below register a new task definition revision pinned to this exact
+      # SHA tag, so a floating mutable tag would just be an unused liability.
       - name: Push web image
         env:
           IMAGE: ${{ steps.deployment.outputs.web_repository }}
           IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
-          docker push "$IMAGE:$IMAGE_TAG"
-          docker push "$IMAGE:latest"
+        run: docker push "$IMAGE:$IMAGE_TAG"
 
       - name: Push API image
         env:
           IMAGE: ${{ steps.deployment.outputs.api_repository }}
           IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker tag "$IMAGE:$IMAGE_TAG" "$IMAGE:latest"
-          docker push "$IMAGE:$IMAGE_TAG"
-          docker push "$IMAGE:latest"
+        run: docker push "$IMAGE:$IMAGE_TAG"
 
   # ---------------------------------------------------------------------
   # API: internal-only service (no ALB), deploys via ECS-native rolling
@@ -197,10 +195,19 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.deploy
     runs-on: ubuntu-latest
     environment: production
-    env:
-      CLUSTER: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster
-      API_SERVICE: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-api
     steps:
+      # The env context can't reference other env keys (including
+      # workflow-level ones) when defining a job's own `env:` block --
+      # GitHub Actions rejects that at parse time. Deriving these into
+      # $GITHUB_ENV here instead makes them available to every later step
+      # in this job exactly like a job-level env: block would.
+      - name: Compute service names
+        run: |
+          {
+            echo "CLUSTER=${PROJECT_NAME}-${ENVIRONMENT}-cluster"
+            echo "API_SERVICE=${PROJECT_NAME}-${ENVIRONMENT}-api"
+          } >> "$GITHUB_ENV"
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -209,7 +216,6 @@ jobs:
 
       - name: Verify API image matches this build
         run: |
-          IMAGE="${{ needs.build-and-push.outputs.api_image }}:${{ needs.build-and-push.outputs.image_tag }}"
           aws ecr describe-images \
             --repository-name "${PROJECT_NAME}-${ENVIRONMENT}-api" \
             --image-ids imageTag=${{ needs.build-and-push.outputs.image_tag }} >/dev/null
@@ -260,12 +266,18 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || inputs.deploy
     runs-on: ubuntu-latest
     environment: production
-    env:
-      CLUSTER: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-cluster
-      WEB_SERVICE: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
-      CODEDEPLOY_APP: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
-      CODEDEPLOY_GROUP: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-web
     steps:
+      # See the same note in deploy-api above -- env can't reference env
+      # when defining a job's own env: block, so compute into $GITHUB_ENV.
+      - name: Compute service names
+        run: |
+          {
+            echo "CLUSTER=${PROJECT_NAME}-${ENVIRONMENT}-cluster"
+            echo "WEB_SERVICE=${PROJECT_NAME}-${ENVIRONMENT}-web"
+            echo "CODEDEPLOY_APP=${PROJECT_NAME}-${ENVIRONMENT}-web"
+            echo "CODEDEPLOY_GROUP=${PROJECT_NAME}-${ENVIRONMENT}-web"
+          } >> "$GITHUB_ENV"
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:

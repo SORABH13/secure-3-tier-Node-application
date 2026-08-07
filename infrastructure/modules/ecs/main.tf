@@ -31,6 +31,7 @@ resource "aws_ecs_cluster" "this" {
 resource "aws_cloudwatch_log_group" "web" {
   name              = format("/ecs/%s-web", local.name_prefix)
   retention_in_days = 30
+  kms_key_id        = var.kms_key_arn != "" ? var.kms_key_arn : null
 
   tags = merge(local.common_tags, {
     Name = format("%s-web-log", local.name_prefix)
@@ -40,6 +41,7 @@ resource "aws_cloudwatch_log_group" "web" {
 resource "aws_cloudwatch_log_group" "api" {
   name              = format("/ecs/%s-api", local.name_prefix)
   retention_in_days = 30
+  kms_key_id        = var.kms_key_arn != "" ? var.kms_key_arn : null
 
   tags = merge(local.common_tags, {
     Name = format("%s-api-log", local.name_prefix)

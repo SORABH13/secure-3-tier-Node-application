@@ -56,6 +56,13 @@ resource "aws_db_instance" "this" {
   publicly_accessible       = false
   parameter_group_name      = aws_db_parameter_group.this.name
 
+  # Additive auth option -- the app keeps using its Secrets Manager password
+  # today, this just makes IAM-based DB auth available without requiring an
+  # app change. Performance Insights uses the 7-day free retention tier.
+  iam_database_authentication_enabled = true
+  performance_insights_enabled        = true
+  performance_insights_kms_key_id     = var.kms_key_id != "" ? var.kms_key_id : null
+
   tags = merge(local.common_tags, {
     Name = format("%s-postgres-db", local.name_prefix)
   })

@@ -9,8 +9,14 @@ variable "environment" {
 }
 
 variable "kms_key_arn" {
-  description = "KMS CMK ARN used to encrypt CloudTrail log files."
+  description = "KMS CMK ARN used to encrypt CloudTrail log files (S3). Must be a key whose policy grants cloudtrail.amazonaws.com -- see the kms module's dedicated cloudtrail_key_arn output."
   type        = string
+}
+
+variable "log_group_kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt the CloudTrail CloudWatch Logs group. Must be a key whose policy grants logs.amazonaws.com -- see the kms module's data_key_arn output. Leave empty to use CloudWatch's default encryption."
+  type        = string
+  default     = ""
 }
 
 variable "retention_days" {

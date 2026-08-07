@@ -133,6 +133,12 @@ variable "api_service_discovery_namespace" {
   default     = ""
 }
 
+variable "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt ECS CloudWatch log groups. Leave empty to use CloudWatch's default encryption."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags applied to ECS resources."
   type        = map(string)

@@ -47,7 +47,7 @@ data "aws_iam_policy_document" "data_key" {
     effect = "Allow"
     principals {
       type        = "Service"
-      identifiers = ["rds.amazonaws.com", "secretsmanager.amazonaws.com", "backup.amazonaws.com"]
+      identifiers = ["rds.amazonaws.com", "secretsmanager.amazonaws.com", "backup.amazonaws.com", "sns.amazonaws.com"]
     }
     actions = [
       "kms:Decrypt",
@@ -58,7 +58,33 @@ data "aws_iam_policy_document" "data_key" {
     ]
     resources = ["*"]
   }
+
+  # CloudWatch Logs needs its own statement: it authorizes by encryption
+  # context (the specific log group ARN), not a blanket service grant.
+  statement {
+    sid    = "AllowCloudWatchLogsUse"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = [format("logs.%s.amazonaws.com", data.aws_region.current.name)]
+    }
+    actions = [
+      "kms:Encrypt*",
+      "kms:Decrypt*",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:Describe*",
+    ]
+    resources = ["*"]
+    condition {
+      test     = "ArnLike"
+      variable = "kms:EncryptionContext:aws:logs:arn"
+      values   = [format("arn:aws:logs:%s:%s:log-group:*", data.aws_region.current.name, data.aws_caller_identity.current.account_id)]
+    }
+  }
 }
+
+data "aws_region" "current" {}
 
 # CloudTrail requires a dedicated key policy shape (encryption-context bound
 # to the specific trail ARN), so it gets its own CMK rather than sharing the

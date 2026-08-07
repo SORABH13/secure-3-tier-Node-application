@@ -68,6 +68,18 @@ variable "tags" {
   default     = {}
 }
 
+variable "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt the VPC Flow Logs CloudWatch log group. Leave empty to use CloudWatch's default encryption."
+  type        = string
+  default     = ""
+}
+
+variable "flow_log_retention_days" {
+  description = "Retention period in days for VPC Flow Logs in CloudWatch."
+  type        = number
+  default     = 30
+}
+
 locals {
   subnet_count_equal = length(var.availability_zones) == length(var.public_subnet_cidrs) && length(var.availability_zones) == length(var.private_app_subnet_cidrs) && length(var.availability_zones) == length(var.private_db_subnet_cidrs)
 }

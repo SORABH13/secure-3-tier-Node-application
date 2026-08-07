@@ -119,7 +119,13 @@ data "aws_iam_policy_document" "task_role_policy" {
       "logs:PutLogEvents",
       "logs:CreateLogGroup"
     ]
-    resources = ["arn:aws:logs:*:*:log-group:/ecs/*"]
+    # Scoped to exactly the two log groups the ecs module creates (mirrored
+    # by name here to avoid an iam -> ecs module dependency cycle -- ecs
+    # already depends on this module's role ARNs).
+    resources = [
+      format("arn:aws:logs:*:*:log-group:/ecs/%s-web*", local.name_prefix),
+      format("arn:aws:logs:*:*:log-group:/ecs/%s-api*", local.name_prefix),
+    ]
   }
 
   dynamic "statement" {

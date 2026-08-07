@@ -8,6 +8,10 @@ locals {
   })
 }
 
+#tfsec:ignore:aws-elb-alb-not-public -- required to be internet-facing per
+# the assignment ("Web tier publicly accessible"); this is CloudFront/WAF's
+# origin, not something end users hit directly, but it must accept traffic
+# from CloudFront's changing IP ranges, so it can't be made internal.
 resource "aws_lb" "this" {
   name                       = format("%s-alb", local.name_prefix)
   internal                   = false
@@ -15,6 +19,7 @@ resource "aws_lb" "this" {
   security_groups            = [var.security_group_id]
   subnets                    = var.subnet_ids
   enable_deletion_protection = false
+  drop_invalid_header_fields = true
 
   tags = merge(local.common_tags, {
     Name = format("%s-alb", local.name_prefix)
@@ -75,6 +80,9 @@ resource "aws_lb_target_group" "web_green" {
   })
 }
 
+#tfsec:ignore:aws-elb-http-not-used -- only exists when certificate_arn is
+# unset (see terraform.tfvars.example); the moment a real ACM cert is
+# supplied, this listener disappears in favor of http_redirect+https below.
 resource "aws_lb_listener" "http" {
   count             = var.certificate_arn == "" ? 1 : 0
   load_balancer_arn = aws_lb.this.arn

@@ -116,7 +116,8 @@ resource "aws_cloudwatch_dashboard" "this" {
 # endpoint (PagerDuty/Opsgenie integration URL) in addition to, or instead
 # of, the email subscription below.
 resource "aws_sns_topic" "alerts" {
-  name = format("%s-alerts", local.name_prefix)
+  name              = format("%s-alerts", local.name_prefix)
+  kms_master_key_id = var.kms_key_arn != "" ? var.kms_key_arn : null
 
   tags = merge(local.common_tags, {
     Name = format("%s-alerts", local.name_prefix)
