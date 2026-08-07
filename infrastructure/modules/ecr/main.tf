@@ -1,7 +1,81 @@
-# $module module: define resources for the $module layer here.
-# No actual AWS resources are created in this boilerplate.
+resource "aws_ecr_repository" "web" {
+  name                 = format("%s-%s-web", var.project_name, var.environment)
+  image_tag_mutability = var.image_tag_mutability
+  force_delete         = var.force_delete
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  encryption_configuration {
+    encryption_type = var.kms_key_arn != "" ? "KMS" : "AES256"
+    kms_key         = var.kms_key_arn != "" ? var.kms_key_arn : null
+  }
 
-# Example:
-# resource "aws_vpc" "this" {
-#   cidr_block = var.vpc_cidr
-# }
+  tags = merge(var.tags, {
+    Name        = format("%s-%s-web", var.project_name, var.environment)
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Owner       = "Sourabh Yogi"
+  })
+}
+
+resource "aws_ecr_lifecycle_policy" "web" {
+  repository = aws_ecr_repository.web.name
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep the most recent 10 images."
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_ecr_repository" "api" {
+  name                 = format("%s-%s-api", var.project_name, var.environment)
+  image_tag_mutability = var.image_tag_mutability
+  force_delete         = var.force_delete
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  encryption_configuration {
+    encryption_type = var.kms_key_arn != "" ? "KMS" : "AES256"
+    kms_key         = var.kms_key_arn != "" ? var.kms_key_arn : null
+  }
+
+  tags = merge(var.tags, {
+    Name        = format("%s-%s-api", var.project_name, var.environment)
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    Owner       = "Sourabh Yogi"
+  })
+}
+
+resource "aws_ecr_lifecycle_policy" "api" {
+  repository = aws_ecr_repository.api.name
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Keep the most recent 10 images."
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 10
+        }
+        action = {
+          type = "expire"
+        }
+      }
+    ]
+  })
+}

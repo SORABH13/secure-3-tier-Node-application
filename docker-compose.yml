@@ -33,6 +33,7 @@ services:
       DBPASS: ${POSTGRES_PASSWORD:-devops_pass}
       DBHOST: postgres
       DBPORT: 5432
+      DBSSL: "false"
     ports:
       - "3001:3001"
     networks:

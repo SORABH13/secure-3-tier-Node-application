@@ -1,0 +1,19 @@
+node_modules/
+
+.terraform/
+.terraform_data/
+*.tfstate
+*.tfstate.*
+
+# Never commit real variable values or plan output -- both can contain secrets.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+*.plan
+*.tfplan
+crash.log
+crash.*.log
+terraform-outputs*.json
+
+# OS cruft
+.DS_Store

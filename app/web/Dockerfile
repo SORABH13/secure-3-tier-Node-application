@@ -1,5 +1,5 @@
 # Use a specific Node LTS patch version on Alpine for a compact, stable runtime.
-FROM node:20.19.0-alpine
+FROM node:18.20.2-alpine
 
 # OCI labels provide metadata for image inspection and compliance.
 LABEL org.opencontainers.image.authors="Sourabh Yogi"

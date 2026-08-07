@@ -9,16 +9,23 @@ This directory contains the Terraform project structure for deploying the secure
 
 ## Modules
 
-- `networking`: VPC, subnets, route tables, and networking primitives.
-- `security`: Security groups, NACLs, and network security constructs.
-- `ecr`: Elastic Container Registry repositories and image lifecycle settings.
-- `ecs`: ECS cluster, task definitions, and Fargate service orchestration.
-- `alb`: Application Load Balancer, listeners, and target groups.
-- `rds`: Amazon RDS database resources and subnet groups.
-- `cloudwatch`: Metrics, logs, and alarms for observability.
-- `cloudfront`: CDN distribution and cache behavior for the frontend.
-- `iam`: IAM roles, policies, and service principals.
-- `secrets-manager`: Secrets Manager secrets and secret rotation setup.
+- `networking`: VPC, public/private-app/private-db subnets across 2 AZs, one NAT Gateway per AZ, route tables.
+- `security`: Security groups (ALB -> web -> api -> postgres, no wider access).
+- `ecr`: Elastic Container Registry repositories with image scan-on-push and lifecycle policies.
+- `ecs`: ECS cluster (Container Insights enabled), task definitions, Fargate services (web = CodeDeploy blue/green controller, api = ECS rolling), autoscaling.
+- `alb`: Application Load Balancer, blue+green target groups, HTTP/HTTPS listeners.
+- `rds`: RDS PostgreSQL, Multi-AZ, encrypted, private subnets only, deletion protection.
+- `cloudwatch`: Dashboard, 10 CloudWatch alarms (ALB/ECS/RDS), SNS alerts topic.
+- `cloudfront`: CDN distribution in front of the ALB, WAF web ACL attached.
+- `iam`: ECS task/execution roles, plus GitHub Actions OIDC provider and two least-privilege deploy/terraform roles.
+- `secrets-manager`: DB credentials secret (or reuses an existing one via `existing_secret_name`).
+- `kms`: Customer-managed keys for RDS/Secrets Manager/Backup and for CloudTrail.
+- `waf`: WAFv2 web ACL (AWS managed rule groups + per-IP rate limit) for CloudFront.
+- `cloudtrail`: Multi-region audit trail to an encrypted, versioned, lifecycle-managed S3 bucket.
+- `backup`: AWS Backup vault + daily plan + selection for RDS.
+- `codedeploy`: CodeDeploy application/deployment group for Web blue/green + canary traffic shifting, with alarm-based auto-rollback.
+
+See [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for the full diagram and rationale, and [../docs/DEPLOYMENT_GUIDE.md](../docs/DEPLOYMENT_GUIDE.md) for how to apply this for the first time (and what to expect if applying on top of an already-running environment).
 
 ## Environments
 
@@ -47,4 +54,9 @@ terraform validate
 terraform plan
 ```
 
-No AWS resources are provisioned by this scaffold until actual resource definitions are added to modules.
+6. Review the plan, then apply:
+
+```sh
+terraform plan -var-file=terraform.tfvars -out=tfplan
+terraform apply tfplan
+```

@@ -1,10 +1,43 @@
-variable "name" {
-  description = "Name prefix for the $module module."
+variable "project_name" {
+  description = "Project name used for ECR repository naming and tagging."
   type        = string
+
+  validation {
+    condition     = length(trimspace(var.project_name)) > 0
+    error_message = "project_name cannot be empty."
+  }
+}
+
+variable "environment" {
+  description = "Environment used for ECR repository naming and tagging."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.environment)) > 0
+    error_message = "environment cannot be empty."
+  }
 }
 
 variable "tags" {
-  description = "Common tags for resources created by the $module module."
+  description = "Additional tags applied to ECR repositories."
   type        = map(string)
   default     = {}
+}
+
+variable "image_tag_mutability" {
+  description = "Image tag mutability for ECR repositories. Immutable by default -- deploys always reference a specific commit-SHA tag registered in the task definition, never :latest, so nothing needs to overwrite an existing tag."
+  type        = string
+  default     = "IMMUTABLE"
+}
+
+variable "force_delete" {
+  description = "Allow deletion of repositories that still contain images. Intended only for teardown."
+  type        = bool
+  default     = false
+}
+
+variable "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt ECR repository images. Leave empty to use AES256 (ECR's default)."
+  type        = string
+  default     = ""
 }

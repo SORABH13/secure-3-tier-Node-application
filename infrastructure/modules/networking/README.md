@@ -1,18 +1,38 @@
-# $module Module
+# Networking Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module creates the AWS networking foundation for the toptal production architecture.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Provision a VPC with public, private application, and private database subnets.
+- Configure internet connectivity through an Internet Gateway and NAT Gateway.
+- Keep database subnets isolated from direct internet access.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `vpc_cidr`
+- `availability_zones`
+- `public_subnet_cidrs`
+- `private_app_subnet_cidrs`
+- `private_db_subnet_cidrs`
+- `enable_dns_support`
+- `enable_dns_hostnames`
+- `tags`
+
+## Outputs
+
+- `vpc_id`
+- `public_subnet_ids`
+- `private_app_subnet_ids`
+- `private_db_subnet_ids`
+- `nat_gateway_id`
+- `internet_gateway_id`
+
+## Architecture Notes
+
+- Two public subnets provide connectivity for the ALB and NAT Gateway.
+- Two private application subnets host ECS tasks with outbound internet access via NAT.
+- Two private database subnets host RDS instances without direct internet routes.
+- Public and private route tables are separated for security and availability.

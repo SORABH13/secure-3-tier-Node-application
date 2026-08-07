@@ -1,39 +1,36 @@
 var express = require('express');
 var app = express();
-var uuid = require('node-uuid');
+var Pool = require('pg').Pool;
 
-var pg = require('pg');
 const conString = {
     user: process.env.DBUSER,
     database: process.env.DB,
     password: process.env.DBPASS,
     host: process.env.DBHOST,
-    port: process.env.DBPORT                
+    port: process.env.DBPORT,
+    // RDS requires SSL, so it's on by default; local docker-compose Postgres
+    // doesn't speak SSL, so it sets DBSSL=false.
+    ssl: process.env.DBSSL === 'false' ? false : { rejectUnauthorized: false }
 };
 
-// Routes
-app.get('/api/status', function(req, res) {
-//'SELECT now() as time', [], function(err, result
-  
-  const Pool = require('pg').Pool
-  const pool = new Pool(conString)
-  // connection using created pool
+// Create the pool once, reuse across requests
+const pool = new Pool(conString);
+
+app.get('/api/status', function(req, res, next) {
   pool.connect((err, client, release) => {
     if (err) {
-      return console.error('Error acquiring client', err.stack)
+      console.error('Error acquiring client', err.stack);
+      return next(err);
     }
     client.query('SELECT now() as time', (err, result) => {
-      release()
-    if (err) {
-      console.log(err);
-      return console.error('Error executing query', err.stack)
-    }
-    res.status(200).send(result.rows);
+      release();
+      if (err) {
+        console.error('Error executing query', err.stack);
+        return next(err);
+      }
+      res.status(200).send(result.rows);
+    });
   });
-});
-
-  // pool shutdown
-  pool.end()
 });
 
 // catch 404 and forward to error handler
@@ -66,6 +63,5 @@ app.use(function(err, req, res, next) {
     error: {}
   });
 });
-
 
 module.exports = app;

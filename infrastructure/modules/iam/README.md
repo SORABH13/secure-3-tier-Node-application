@@ -1,18 +1,28 @@
-# $module Module
+# IAM Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module provisions IAM roles for ECS task execution and task runtime permissions.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Create an ECS task execution role with ECR and CloudWatch permissions.
+- Create a task role with Secrets Manager access for application runtime secrets.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `ecr_repository_arns`
+- `secret_arns`
+- `tags`
+
+## Outputs
+
+- `task_execution_role_arn`
+- `task_execution_role_name`
+- `task_role_arn`
+- `task_role_name`
+
+## Architecture Notes
+
+The execution role uses the AWS managed ECS execution role policy.
+The task role is scoped to read secrets and write logs using secure, least-privilege policies.

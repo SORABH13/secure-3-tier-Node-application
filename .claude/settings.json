@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(command -v actionlint)",
+      "Bash(actionlint .github/workflows/app.yml)",
+      "Bash(python3 -c \"import yaml,sys; yaml.safe_load\\(open\\('.github/workflows/app.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(gh api *)",
+      "Bash(gh secret *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('protection_rules'\\), indent=2\\)\\); print\\('deployment_branch_policy:', d.get\\('deployment_branch_policy'\\)\\)\")",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('/Users/sourabhyogi/Documents/secure-3-tier-Node-application-1/.github/workflows/infra.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(grep -E '\\\\.plan$|\\\\.tfvars$|\\\\.terraform/|tfstate')"
+    ]
+  }
+}

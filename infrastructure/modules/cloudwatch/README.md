@@ -1,18 +1,27 @@
-# $module Module
+# CloudWatch Module
 
-This Terraform module provides reusable building blocks for the $module layer of the ECS Fargate platform.
+This module creates CloudWatch resources for monitoring the toptal environment.
 
-## Responsibilities
+## Purpose
 
-- Define inputs and outputs for the $module component.
-- Expose a clean interface for environment configurations.
-- Remain resource-agnostic until consumption by environment stacks.
+- Provision CloudWatch log groups.
+- Create a dashboard for ECS, ALB, and RDS metrics.
 
-## Example
+## Inputs
 
-```hcl
-module "$module" {
-  source = "../../modules/$module"
-  # module inputs here
-}
-```
+- `project_name`
+- `environment`
+- `dashboard_name`
+- `log_group_names`
+- `cluster_name`
+- `web_service_name`
+- `api_service_name`
+- `load_balancer_name`
+- `target_group_name`
+- `db_instance_identifier`
+- `tags`
+
+## Outputs
+
+- `dashboard_name`
+- `log_group_names`

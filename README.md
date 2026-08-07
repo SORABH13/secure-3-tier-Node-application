@@ -1,41 +1,47 @@
 # Secure 3-Tier Node Application
 
-This repository contains a simple three-tier Node.js application with separate web and API services.
+A three-tier Node.js application (Web + API + PostgreSQL) with a production-grade AWS deployment: ECS Fargate, Multi-AZ RDS, CloudFront + WAF, CodeDeploy blue/green, and fully automated CI/CD -- all provisioned via Terraform.
 
 ## Project structure
 
-- `app/api`: Backend API service.
-- `app/web`: Frontend web service.
-- `docker-compose.yml`: Container orchestration for PostgreSQL, API, and web.
-- `PROJECT_ANALYSIS.md`: Architecture and deployment analysis.
-- `docs/DECISIONS.md`: Architectural decision log.
+- `app/api`: Backend API service (Express + PostgreSQL).
+- `app/web`: Frontend web service (Express + Pug), calls the API server-side.
+- `infrastructure/`: Terraform IaC for the AWS deployment (`modules/` + `environments/prod`).
+- `.github/workflows/`: CI/CD pipelines (`app.yml` for the application, `infra.yml` for Terraform).
+- `scripts/`: Operational scripts (RDS backup/restore, Terraform output export, environment teardown).
+- `docker-compose.yml`: Local/dev orchestration for PostgreSQL, API, and web.
+- `docs/`: Architecture diagram, deployment guide, runbook, interview notes, and the architectural decision log.
 
-## Containerized setup
-
-The application is containerized using Docker Compose and is designed for local or development deployment.
-
-### Build and start
+## Local development (Docker Compose)
 
 ```sh
 docker compose up --build
 ```
 
-### Access
-
 - Web app: `http://localhost:3000`
 - API: `http://localhost:3001/api/status`
+- PostgreSQL data persists in the named volume `postgres_data`.
 
-### Data persistence
+Both app services run as a non-root user, use official Node LTS Alpine base images, and have container healthchecks. The web service reaches the API by Docker service name.
 
-PostgreSQL data is stored in a named volume: `postgres_data`.
+## AWS deployment
 
-## Notes
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full diagram and design rationale, and [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for how to provision it (first-time `terraform apply`, GitHub OIDC setup, ongoing deploys).
 
-- Both app services are built from official Node LTS images.
-- Each app runs as a non-root user inside its container.
-- Healthchecks are enabled for PostgreSQL, API, and web services.
-- The web service communicates with the API by service name using Docker networking.
+At a glance: CloudFront + WAF in front of an ALB, ECS Fargate web/API tasks in private subnets across 2 AZs, Multi-AZ RDS PostgreSQL in subnets with no internet route, per-AZ NAT Gateways, Secrets Manager + KMS for credentials, CloudWatch alarms + SNS for alerting, CloudTrail for audit logging, and AWS Backup for daily RDS recovery points.
+
+## CI/CD
+
+- `app.yml`: lint -> dependency + image security scan -> unit tests -> build/push to ECR -> deploy API (ECS rolling) + Web (CodeDeploy blue/green with canary traffic shifting and alarm-based auto-rollback) -> smoke test.
+- `infra.yml`: tfsec -> `terraform plan` -> manual approval -> `terraform apply`.
+
+Both authenticate to AWS via GitHub OIDC (no long-lived AWS keys in CI).
 
 ## Documentation
 
-Detailed architectural decisions are tracked in `docs/DECISIONS.md`.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) -- diagram and design rationale
+- [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) -- how to provision and deploy
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) -- operational procedures per alarm/incident
+- [docs/INTERVIEW_NOTES.md](docs/INTERVIEW_NOTES.md) -- talking points, likely questions, common mistakes avoided
+- [docs/DECISIONS.md](docs/DECISIONS.md) / [docs/DOCKER_DECISIONS.md](docs/DOCKER_DECISIONS.md) -- architectural decision log
+- [infrastructure/README.md](infrastructure/README.md) -- Terraform module reference
