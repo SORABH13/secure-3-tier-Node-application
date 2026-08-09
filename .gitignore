@@ -17,3 +17,6 @@ terraform-outputs*.json
 
 # OS cruft
 .DS_Store
+
+# Local AI-assistant tooling config -- not part of the application/infra.
+.claude/

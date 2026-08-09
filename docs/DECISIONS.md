@@ -52,6 +52,14 @@ This document captures major architectural, deployment, and implementation decis
 - Removes the need for hardcoded hostnames or local machine networking hacks.
 - Simplifies the local deployment model while preserving the same service contract.
 
+## CI/CD authentication
+
+### Why static credentials instead of GitHub OIDC, given the IAM roles for OIDC already exist?
+- OIDC federation (`infrastructure/modules/iam`, `enable_github_oidc`) was built and applied first: an `aws_iam_openid_connect_provider` plus two roles trusted via a `sub`-claim condition scoped to this repo.
+- In practice, GitHub never granted the `id-token` permission to any job -- confirmed by the run's own "Permissions" panel never listing `id-token`, across 5+ real CI runs and three different trust-policy subject formats (exact ref, environment-scoped, repo-wildcard). That is a GitHub-platform-level restriction, not something fixable from workflow YAML or the IAM trust policy.
+- Rather than block both pipelines indefinitely on a platform issue outside this repo's control, `app.yml`/`infra.yml` were reverted to short-lived STS credentials stored as GitHub Actions secrets (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_SESSION_TOKEN`) so deploys keep working.
+- The OIDC provider and roles were deliberately left in Terraform rather than removed -- re-enabling OIDC once the platform-side restriction lifts is a credentials-step change in the two workflow files, not new infrastructure. See `docs/DEPLOYMENT_GUIDE.md` for the exact swap-back steps.
+
 ## Documentation
 
 ### Why keep `docs/DECISIONS.md`?
