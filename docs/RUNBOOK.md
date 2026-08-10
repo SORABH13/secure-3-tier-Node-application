@@ -47,6 +47,19 @@ On-call procedures. Each one maps to a specific CloudWatch alarm defined in `inf
 - **Web (CodeDeploy blue/green):** auto-rollback is configured for `DEPLOYMENT_FAILURE` and for the ALB alarms above tripping during the bake window. No action needed in most cases; verify via `aws deploy get-deployment --deployment-id <id>`.
 - **API (ECS rolling):** `app.yml`'s `deploy-api` job captures the previous task definition ARN before deploying and rolls back to it automatically in its `if: failure()` step. Check the GitHub Actions run for the rollback log.
 
+## Manually starting, stopping, or scaling a service
+
+`scripts/manage-service.sh` wraps `aws ecs update-service --desired-count` for one-off operational overrides (maintenance window, cost control outside business hours, manually widening capacity ahead of expected load). Terraform still owns the steady-state autoscaling *policy* (target-tracking CPU, min 2 / max 4 -- `infrastructure/modules/ecs`); after a manual override, autoscaling resumes normal target-tracking on top of whatever desired count this sets.
+
+```sh
+./scripts/manage-service.sh status <web|api|both>          # current desired/running/pending counts
+./scripts/manage-service.sh start  <web|api|both> [count]   # default count: 2
+./scripts/manage-service.sh stop   <web|api|both>           # desired count -> 0
+./scripts/manage-service.sh scale  <web|api|both> <count>
+```
+
+Each subcommand waits for `services-stable` before returning, so it's safe to run as one blocking step in an incident or a maintenance script.
+
 ## Restore the database from backup
 
 Two independent recovery paths:
@@ -78,4 +91,13 @@ terraform taint random_password.db
 terraform apply -var-file=terraform.tfvars
 ```
 
-Terraform generates a new password, updates the RDS instance in place, and writes a new Secrets Manager secret version. Redeploy the API service afterward so running tasks pick up the new secret (`aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment`).
+Terraform generates a new password, updates the RDS instance in place, and writes a new Secrets Manager secret version.
+
+**Redeploy the API service afterward, always.** ECS resolves the `DBPASS` secret from Secrets Manager only at task launch time, not on already-running tasks -- so any rotation (this one, or an incidental one from an unrelated `terraform apply` that happens to touch `random_password.db`) leaves running API tasks holding the *old* password in memory, and every DB query starts failing with `password authentication failed` even though the apply itself reported success. This exact scenario happened during initial rollout of this pipeline (2026-08-07) and caused a real, if brief, outage before it was caught and redeployed manually.
+
+`infra.yml`'s `terraform-apply` job now runs `aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment` automatically after every apply (idempotent -- harmless when the secret didn't change), so this shouldn't recur via CI. Manual applies (`terraform apply` run locally) still need the same manual step:
+
+```sh
+aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment
+aws ecs wait services-stable --cluster toptal-prod-cluster --services toptal-prod-api
+```

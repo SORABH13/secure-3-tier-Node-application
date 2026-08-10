@@ -15,5 +15,12 @@ crash.log
 crash.*.log
 terraform-outputs*.json
 
+# Local env files -- copied from .env.example and filled with real values.
+.env
+.env.local
+
 # OS cruft
 .DS_Store
+
+# Local AI-assistant tooling config -- not part of the application/infra.
+.claude/

@@ -8,7 +8,7 @@ A three-tier Node.js application (Web + API + PostgreSQL) with a production-grad
 - `app/web`: Frontend web service (Express + Pug), calls the API server-side.
 - `infrastructure/`: Terraform IaC for the AWS deployment (`modules/` + `environments/prod`).
 - `.github/workflows/`: CI/CD pipelines (`app.yml` for the application, `infra.yml` for Terraform).
-- `scripts/`: Operational scripts (RDS backup/restore, Terraform output export, environment teardown).
+- `scripts/`: Operational scripts (RDS backup/restore, service start/stop/scale, Terraform output export, environment teardown).
 - `docker-compose.yml`: Local/dev orchestration for PostgreSQL, API, and web.
 - `docs/`: Architecture diagram, deployment guide, runbook, interview notes, and the architectural decision log.
 
@@ -35,7 +35,7 @@ At a glance: CloudFront + WAF in front of an ALB, ECS Fargate web/API tasks in p
 - `app.yml`: lint -> dependency + image security scan -> unit tests -> build/push to ECR -> deploy API (ECS rolling) + Web (CodeDeploy blue/green with canary traffic shifting and alarm-based auto-rollback) -> smoke test.
 - `infra.yml`: tfsec -> `terraform plan` -> manual approval -> `terraform apply`.
 
-Both authenticate to AWS via GitHub OIDC (no long-lived AWS keys in CI).
+Both currently authenticate to AWS via short-lived credentials stored as GitHub Actions secrets (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_SESSION_TOKEN`). GitHub OIDC federation is fully built in Terraform (`infrastructure/modules/iam`, gated behind `enable_github_oidc`) but is currently blocked at the GitHub platform level -- `id-token` was never granted across 5+ real CI runs regardless of workflow permissions or IAM trust-policy shape. See [docs/DECISIONS.md](docs/DECISIONS.md) and [docs/INTERVIEW_NOTES.md](docs/INTERVIEW_NOTES.md) for the full story; re-enabling OIDC once that's resolved is a one-line change per credentials step (see [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)).
 
 ## Documentation
 

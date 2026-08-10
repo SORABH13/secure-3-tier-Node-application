@@ -22,9 +22,6 @@ locals {
   codedeploy_app_name = format("%s-web", local.name_prefix)
 
   github_oidc_enabled = var.enable_github_oidc && var.github_repository != ""
-  github_subjects = [
-    for ref in var.github_allowed_refs : format("repo:%s:ref:refs/heads/%s", var.github_repository, ref)
-  ]
 }
 
 data "aws_caller_identity" "current" {}
@@ -178,10 +175,19 @@ data "aws_iam_policy_document" "github_assume_role" {
       values   = ["sts.amazonaws.com"]
     }
 
+    # GitHub's OIDC token `sub` claim format varies by trigger context --
+    # ref:refs/heads/<branch> for a plain branch push, but
+    # environment:<name> instead (regardless of branch) for any job that
+    # sets `environment:`, which every deploy/apply job here does. Matching
+    # the exact format per job type is brittle and was actively wrong
+    # (denied real CI runs) when tried. StringLike with a repo-scoped
+    # wildcard is still restricted to only this exact repository -- no
+    # other repo or fork can match -- just not to a specific ref/environment
+    # within it.
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = local.github_subjects
+      values   = [format("repo:%s:*", var.github_repository)]
     }
   }
 }

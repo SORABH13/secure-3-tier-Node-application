@@ -48,9 +48,4 @@ variable "github_repository" {
   default     = ""
 }
 
-variable "github_allowed_refs" {
-  description = "Git refs (branches) allowed to assume the OIDC roles, e.g. [\"master\"]. Each entry is expanded to repo:<github_repository>:ref:refs/heads/<branch>."
-  type        = list(string)
-  default     = ["master"]
-}
 

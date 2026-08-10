@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   AWS_REGION: us-east-1
@@ -31,7 +30,10 @@ jobs:
         with:
           working_directory: infrastructure
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          additional_args: --config-file .tfsec/config.yml
+          # tfsec-action cd's into $GITHUB_WORKSPACE (repo root), not
+          # working_directory, then passes working_directory as tfsec's scan
+          # target -- so additional_args paths resolve from the repo root too.
+          additional_args: --config-file infrastructure/.tfsec/config.yml
 
   terraform-plan:
     name: Terraform Plan
@@ -41,10 +43,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Configure AWS credentials via OIDC
+      # terraform.tfvars is gitignored on purpose (it used to hold a
+      # plaintext DB password before random_password.db took over -- see
+      # main.tf). Every remaining value in it is non-sensitive and identical
+      # to terraform.tfvars.example, so CI just uses the example directly
+      # rather than needing a secret-backed copy of the file.
+      - name: Prepare tfvars
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: cp terraform.tfvars.example terraform.tfvars
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Terraform
@@ -97,10 +110,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Configure AWS credentials via OIDC
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Download tfplan
@@ -121,3 +136,16 @@ jobs:
       - name: Terraform apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -input=false tfplan
+
+      # ECS resolves the DBPASS secret from Secrets Manager only at task
+      # launch, not on a running task -- so whenever this apply rotates
+      # random_password.db, already-running API tasks keep the *old*
+      # password in memory and start failing DB auth, even though the
+      # apply itself succeeds. Forcing a redeploy here is cheap and
+      # idempotent (harmless when the secret didn't change), and closes
+      # this outage window automatically instead of relying on a human to
+      # remember the manual step documented in docs/RUNBOOK.md.
+      - name: Redeploy API to pick up any rotated secret
+        run: |
+          aws ecs update-service --cluster toptal-prod-cluster --service toptal-prod-api --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster toptal-prod-cluster --services toptal-prod-api

@@ -34,22 +34,31 @@ If you're applying this configuration on top of infrastructure that predates the
 
 If any of this is unacceptable for a live cutover, apply module-by-module with `-target` and schedule the ECS web replacement separately from the rest.
 
-## Wiring up GitHub Actions (OIDC, no static keys)
+## Wiring up GitHub Actions (current: static credentials)
 
-After the first `terraform apply`, read the OIDC role ARNs from the outputs and set them as **repository variables** (not secrets -- role ARNs aren't sensitive) in GitHub: Settings -> Secrets and variables -> Actions -> Variables.
+Both workflows currently authenticate with `aws-actions/configure-aws-credentials` reading three **repository secrets** under the `production` environment (Settings -> Environments -> production -> Secrets):
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_SESSION_TOKEN`
+
+These are short-lived STS credentials (an access key alone would have no session token), not a permanent IAM user key, but they still need manual rotation before they expire -- see `docs/RUNBOOK.md`/`docs/DECISIONS.md` for why this is the fallback rather than the target design.
+
+Set an `environment: production` protection rule in GitHub (Settings -> Environments) requiring manual approval -- this is what gates `infra.yml`'s `terraform apply` job and `app.yml`'s deploy jobs, independent of which credential method is in use.
+
+### Re-enabling OIDC (once the GitHub-side restriction lifts)
+
+The IAM roles and OIDC provider are already provisioned by `infrastructure/modules/iam` (`enable_github_oidc = true` by default, scoped to `github_repository`). Swapping back is IAM-side already done -- it's purely a workflow change:
 
 ```sh
 terraform output -raw github_app_deploy_role_arn
 terraform output -raw github_terraform_role_arn
 ```
 
-Set:
-- `AWS_APP_DEPLOY_ROLE_ARN` = the first value (used by `app.yml`)
-- `AWS_TERRAFORM_ROLE_ARN` = the second value (used by `infra.yml`)
-
-Then **delete** the old `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` repository secrets -- they're no longer used by either workflow and are long-lived credentials that shouldn't linger.
-
-Set an `environment: production` protection rule in GitHub (Settings -> Environments) requiring manual approval -- this is what gates `infra.yml`'s `terraform apply` job and `app.yml`'s deploy jobs.
+1. Set those two ARNs as **repository variables** (not secrets -- role ARNs aren't sensitive): `AWS_APP_DEPLOY_ROLE_ARN` (used by `app.yml`) and `AWS_TERRAFORM_ROLE_ARN` (used by `infra.yml`).
+2. In both workflows, replace the `aws-access-key-id`/`aws-secret-access-key`/`aws-session-token` inputs on `configure-aws-credentials` with `role-to-assume: ${{ vars.AWS_APP_DEPLOY_ROLE_ARN }}` (or the terraform role, per job) and add `permissions: id-token: write` at the job level.
+3. Confirm the run's "Permissions" panel actually lists `id-token` before trusting it -- this is exactly the check that failed repeatedly last time (see `docs/DECISIONS.md`).
+4. Once confirmed working, delete the `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` secrets.
 
 ## Ongoing deploys
 

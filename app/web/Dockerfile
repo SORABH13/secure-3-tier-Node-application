@@ -1,10 +1,26 @@
-# Use a specific Node LTS patch version on Alpine for a compact, stable runtime.
-FROM node:18.20.2-alpine
+# Multi-stage build: dependencies are installed in this stage only, so npm
+# itself (and its own bundled tar/minimatch/sigstore, which carry known
+# CVEs unrelated to this app -- see docs/DECISIONS.md) never ships in the
+# runtime image below.
+FROM node:20.20.2-alpine AS deps
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --production; fi
+
+# ---- runtime image ----
+FROM node:20.20.2-alpine
 
 # OCI labels provide metadata for image inspection and compliance.
 LABEL org.opencontainers.image.authors="Sourabh Yogi"
 LABEL org.opencontainers.image.description="Web service for the secure 3-tier Node.js application"
 LABEL org.opencontainers.image.version="1.0.0"
+
+# Pull the latest available OS security patches at build time -- closes the
+# gap between when a base image tag was published and when a CVE fix lands
+# in Alpine's package repo (they lag independently).
+RUN apk update && apk upgrade --no-cache
 
 # Create a dedicated non-root user for runtime security.
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -14,15 +30,14 @@ WORKDIR /usr/src/app
 # Keep the runtime environment explicit and production-safe.
 ENV NODE_ENV=production
 
-# Copy package metadata first with ownership assigned to the non-root user.
-COPY --chown=appuser:appgroup package*.json ./
-
-# Install production dependencies from lockfile for reproducible builds.
-# Fall back to npm install when package-lock.json is missing.
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --production; fi
-
-# Copy application code with ownership for the non-root user.
+# Bring in only the resolved dependencies from the deps stage, then the
+# application code -- no package manager involved in this stage at all.
+COPY --chown=appuser:appgroup --from=deps /usr/src/app/node_modules ./node_modules
 COPY --chown=appuser:appgroup . .
+
+# npm/npx are never invoked at runtime (CMD calls node directly) -- removing
+# them drops npm's own bundled dependencies (and their CVEs) from the image.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # Run as the non-root user for security.
 USER appuser
